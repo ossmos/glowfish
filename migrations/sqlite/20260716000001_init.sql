@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS buffer_metadata (
     header_size         INTEGER NOT NULL,
     project_id          INTEGER NOT NULL,
     channel             INTEGER NOT NULL,
+    process             INTEGER NOT NULL,
     process_time        INTEGER NOT NULL,
     process_datetime    TIMESTAMP NOT NULL,
     db_header_size      INTEGER NOT NULL,

@@ -2,33 +2,27 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
+use sqlx::{QueryBuilder, Sqlite};
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use crate::error::StoreError;
+use crate::filter::MetadataFilter;
 use crate::metadata::StreamFileMetadata;
 use crate::scan::scan_dir;
 
 pub struct SqliteStore {
-    read_only_pool: SqlitePool,
-    write_pool: SqlitePool,
+    pool: SqlitePool,
 }
 
 impl SqliteStore {
     pub async fn connect(url: &str) -> Result<Self, StoreError> {
         let opts = SqliteConnectOptions::from_str(url)?.create_if_missing(true);
-        let read_only_pool = SqlitePoolOptions::new()
+        let pool = SqlitePoolOptions::new()
             .max_connections(5)
-            .connect_with(opts.clone().read_only(true))
+            .connect_with(opts)
             .await?;
-        let write_pool = SqlitePoolOptions::new()
-            .max_connections(5)
-            .connect_with(opts.read_only(false))
-            .await?;
-        Ok(Self {
-            read_only_pool,
-            write_pool,
-        })
+        Ok(Self { pool })
     }
 }
 
@@ -48,6 +42,7 @@ pub trait MetadataStore: Send + Sync {
     //    sql: &str,
     //    binds: Vec<Value>,
     //) -> Result<Vec<StreamFileMetadata>, StoreError>;
+    async fn find(&self, filter: MetadataFilter) -> Result<Vec<StreamFileMetadata>, StoreError>;
     async fn insert_many(&self, files: &[StreamFileMetadata]) -> Result<(), StoreError>;
     async fn synchronize_directory(&self, path: PathBuf) -> Result<SyncStats, StoreError> {
         let scanned = tokio::task::spawn_blocking(move || scan_dir(&path, false))
@@ -70,14 +65,12 @@ pub trait MetadataStore: Send + Sync {
 #[async_trait]
 impl MetadataStore for SqliteStore {
     async fn migrate(&self) -> Result<(), StoreError> {
-        sqlx::migrate!("migrations/sqlite")
-            .run(&self.write_pool)
-            .await?;
+        sqlx::migrate!("migrations/sqlite").run(&self.pool).await?;
         Ok(())
     }
 
     async fn insert_many(&self, files: &[StreamFileMetadata]) -> Result<(), StoreError> {
-        let mut tx = self.write_pool.begin().await?;
+        let mut tx = self.pool.begin().await?;
         for f in files {
             // Maybe QueryBuilder is more performant here
             let _rec = sqlx::query(
@@ -88,6 +81,7 @@ impl MetadataStore for SqliteStore {
                     header_size,
                     project_id,
                     channel,
+                    process,
                     process_time,
                     process_datetime,
                     db_header_size,
@@ -112,13 +106,14 @@ impl MetadataStore for SqliteStore {
                     db_spec_count,
                     sample_count,
                     spec_count
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         "#,
                     )
             .bind(&f.filepath)
             .bind(f.header_size)
             .bind(f.project_id as i64)
             .bind(f.channel)
+            .bind(f.process)
             .bind(f.process_time)
             .bind(f.process_datetime)
             .bind(f.db_header_size)
@@ -150,6 +145,17 @@ impl MetadataStore for SqliteStore {
         Ok(())
     }
 
+    async fn find(&self, filter: MetadataFilter) -> Result<Vec<StreamFileMetadata>, StoreError> {
+        let mut builder: QueryBuilder<Sqlite> = QueryBuilder::new("SELECT * FROM buffer_metadata");
+        filter.apply(&mut builder);
+        builder.push(" ORDER BY process DESC");
+        let rows = builder
+            .build_query_as::<StreamFileMetadata>()
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows)
+    }
+
     //async fn find_raw(
     //    &self,
     //    sql: &str,
@@ -166,13 +172,6 @@ impl MetadataStore for SqliteStore {
     //    }
     //    Ok(vec![])
     //}
-}
-
-pub enum Bind {
-    String(String),
-    Int(i64),
-    Float(f64),
-    DateTime(DateTime<Utc>),
 }
 
 //#[cfg(feature = "postgres")]
@@ -224,3 +223,82 @@ pub enum Bind {
 //        rows.iter().map(pg_row_to_metadata).collect()
 //    }
 //}
+
+#[cfg(test)]
+mod tests {
+    use crate::filter::COLUMNS;
+
+    use super::*;
+    use chrono::Utc;
+    use sqlx::sqlite::Sqlite;
+
+    async fn setup() -> SqliteStore {
+        let store = SqliteStore::connect("sqlite://:memory:")
+            .await
+            .expect("Database connection failed");
+        store.migrate().await.expect("migration failed");
+        store
+    }
+
+    async fn insert_test_data(store: &impl MetadataStore) {
+        let stream_files: Vec<StreamFileMetadata> = (0..10)
+            .map(|i| StreamFileMetadata {
+                id: None,
+                filepath: format!("foo-{}", i),
+                header_size: 2000,
+                project_id: 10000000,
+                channel: 1,
+                process: i,
+                process_time: 1,
+                process_datetime: Utc::now(),
+                db_header_size: 1,
+                bytes_per_sample: 2,
+                db_size: 1,
+                frq_bands: 512,
+                compression_time: 1,
+                compression_frq: 1,
+                avg_time: 1,
+                avg_frq: 1,
+                spec_duration: 1,
+                frq_start: 0,
+                frq_end: 512,
+                frq_per_band: 1,
+                //adc_type: stream_file.//adc_type,
+                bit_resolution: 2,
+                fft_log_shift: 2,
+                //max_amplitude_level
+                streamno: 0,
+                preamp_gain: 1,
+                file_size: 0,
+                db_count: 1,
+                db_sample_count: 1,
+                db_spec_count: 1,
+                sample_count: 1,
+                spec_count: 1,
+            })
+            .collect();
+        store
+            .insert_many(&stream_files)
+            .await
+            .expect("Insertion of test files failed");
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_store() {
+        let store = setup().await;
+        insert_test_data(&store).await;
+        let cases = [
+            (MetadataFilter::new().add(COLUMNS.process.eq(4)), 1),
+            (MetadataFilter::new().add(COLUMNS.filepath.like("foo%")), 10),
+            (MetadataFilter::new().add(COLUMNS.process.gt(4)), 5),
+        ];
+
+        for (filter, expected_results) in cases {
+            let results = store
+                .find(filter)
+                .await
+                .expect("Fetching filtered metadata failed");
+            assert_eq!(results.len(), expected_results);
+        }
+    }
+}

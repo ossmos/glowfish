@@ -24,32 +24,40 @@ impl Operator {
 }
 
 #[derive(Debug, Clone)]
-struct Predicate {
+pub struct Predicate {
     pub(crate) column: &'static str,
     pub(crate) operator: Operator,
     pub(crate) value: AttributeValue,
 }
 
-struct IntColumn {
+pub struct IntColumn {
     name: &'static str,
 }
 
 impl IntColumn {
-    fn eq(&self, v: i64) -> Predicate {
+    pub fn eq(&self, v: i64) -> Predicate {
         Predicate {
             column: self.name,
             operator: Operator::Eq,
             value: AttributeValue::Int(v),
         }
     }
+
+    pub fn gt(&self, v: i64) -> Predicate {
+        Predicate {
+            column: self.name,
+            operator: Operator::Gt,
+            value: AttributeValue::Int(v),
+        }
+    }
 }
 
-struct StringColumn {
+pub struct StringColumn {
     name: &'static str,
 }
 
 impl StringColumn {
-    fn like(&self, v: &str) -> Predicate {
+    pub fn like(&self, v: &str) -> Predicate {
         Predicate {
             column: self.name,
             operator: Operator::Like,
@@ -58,7 +66,7 @@ impl StringColumn {
     }
 }
 
-struct Columns {
+pub struct Columns {
     pub process: IntColumn,
     pub filepath: StringColumn,
 }
@@ -69,18 +77,18 @@ pub const COLUMNS: Columns = Columns {
 };
 
 #[derive(Default)]
-struct MetadataFilter {
+pub struct MetadataFilter {
     predicates: Vec<Predicate>,
 }
 
 impl MetadataFilter {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             predicates: Vec::new(),
         }
     }
 
-    fn add(mut self, p: Predicate) -> Self {
+    pub fn add(mut self, p: Predicate) -> Self {
         self.predicates.push(p);
         self
     }
