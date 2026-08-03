@@ -25,9 +25,9 @@ impl Operator {
 
 #[derive(Debug, Clone)]
 pub struct Predicate {
-    pub(crate) column: &'static str,
-    pub(crate) operator: Operator,
-    pub(crate) value: AttributeValue,
+    column: &'static str,
+    operator: Operator,
+    value: AttributeValue,
 }
 
 pub struct IntColumn {
@@ -88,11 +88,12 @@ impl MetadataFilter {
         }
     }
 
-    pub fn add(mut self, p: Predicate) -> Self {
+    pub fn and(mut self, p: Predicate) -> Self {
         self.predicates.push(p);
         self
     }
 
+    #[allow(dead_code)]
     pub(crate) fn get_predicates(&self) -> &[Predicate] {
         &self.predicates
     }
@@ -145,7 +146,7 @@ mod test {
     #[test]
     fn test_apply_query_builder() {
         let mut builder: QueryBuilder<Sqlite> = QueryBuilder::new("SELECT * FROM metadata");
-        let filter = MetadataFilter::new().add(COLUMNS.process.eq(1));
+        let filter = MetadataFilter::new().and(COLUMNS.process.eq(1));
         filter.apply(&mut builder);
         let query = builder.into_string();
         assert_eq!(
@@ -158,8 +159,8 @@ mod test {
     fn test_apply_query_builder_multiple_predicates() {
         let mut builder: QueryBuilder<Sqlite> = QueryBuilder::new("SELECT * FROM metadata");
         let filter = MetadataFilter::new()
-            .add(COLUMNS.process.eq(1))
-            .add(COLUMNS.filepath.like("foo"));
+            .and(COLUMNS.process.eq(1))
+            .and(COLUMNS.filepath.like("foo"));
         filter.apply(&mut builder);
         let query = builder.into_string();
         assert_eq!(

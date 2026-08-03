@@ -1,6 +1,5 @@
 //use sqlx::postgres::Postgres;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 use sqlx::{QueryBuilder, Sqlite};
 use std::path::PathBuf;
@@ -22,6 +21,10 @@ impl SqliteStore {
             .max_connections(5)
             .connect_with(opts)
             .await?;
+        Ok(Self { pool })
+    }
+
+    pub async fn from_pool(pool: SqlitePool) -> Result<Self, StoreError> {
         Ok(Self { pool })
     }
 }
@@ -230,7 +233,6 @@ mod tests {
 
     use super::*;
     use chrono::Utc;
-    use sqlx::sqlite::Sqlite;
 
     async fn setup() -> SqliteStore {
         let store = SqliteStore::connect("sqlite://:memory:")
@@ -288,9 +290,9 @@ mod tests {
         let store = setup().await;
         insert_test_data(&store).await;
         let cases = [
-            (MetadataFilter::new().add(COLUMNS.process.eq(4)), 1),
-            (MetadataFilter::new().add(COLUMNS.filepath.like("foo%")), 10),
-            (MetadataFilter::new().add(COLUMNS.process.gt(4)), 5),
+            (MetadataFilter::new().and(COLUMNS.process.eq(4)), 1),
+            (MetadataFilter::new().and(COLUMNS.filepath.like("foo%")), 10),
+            (MetadataFilter::new().and(COLUMNS.process.gt(4)), 5),
         ];
 
         for (filter, expected_results) in cases {

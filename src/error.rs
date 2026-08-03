@@ -23,10 +23,10 @@ pub enum StoreError {
 
 impl From<sqlx::Error> for StoreError {
     fn from(e: sqlx::Error) -> Self {
-        if let sqlx::Error::Database(ref db) = e {
-            if db.is_unique_violation() {
-                return StoreError::Duplicate;
-            }
+        if let sqlx::Error::Database(ref db) = e
+            && db.is_unique_violation()
+        {
+            return StoreError::Duplicate;
         }
         StoreError::Database(e)
     }
