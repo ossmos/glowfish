@@ -2,7 +2,7 @@ use std::path::Path;
 use walkdir::WalkDir;
 
 use crate::{error::StoreError, metadata::StreamFileMetadata};
-use analyzer_files::stream_file::StreamFile;
+use analyzer_files::StreamFile;
 
 pub fn scan_dir(root: &Path, follow_links: bool) -> Result<Vec<StreamFileMetadata>, StoreError> {
     let mut out = vec![];
@@ -16,7 +16,7 @@ pub fn scan_dir(root: &Path, follow_links: bool) -> Result<Vec<StreamFileMetadat
     {
         let path = entry.path();
 
-        let Ok(stream_file) = StreamFile::new_dep(path.to_path_buf()) else {
+        let Ok(stream_file) = StreamFile::try_from(path) else {
             continue;
         };
         let metadata = StreamFileMetadata::from(stream_file);

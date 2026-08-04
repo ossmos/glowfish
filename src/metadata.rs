@@ -1,4 +1,4 @@
-use analyzer_files::stream_file::StreamFile;
+use analyzer_files::StreamFile;
 use chrono::{DateTime, Utc};
 
 #[derive(Debug, sqlx::FromRow)]
