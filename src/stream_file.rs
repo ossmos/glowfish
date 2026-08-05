@@ -422,7 +422,7 @@ impl TryFrom<&Path> for StreamFile {
             return Err(ParseError::InvalidFile);
         }
         let mut header_size_buffer = vec![0; 12];
-        let _ = file.read_exact(&mut header_size_buffer);
+        file.read_exact(&mut header_size_buffer)?;
         if &header_size_buffer[0..8] != b"qassdata" {
             return Err(ParseError::InvalidFile);
         }
@@ -433,7 +433,7 @@ impl TryFrom<&Path> for StreamFile {
         );
         file.rewind()?;
         let mut file_buffer = vec![0; header_size as usize];
-        let _ = file.read_exact(&mut file_buffer);
+        file.read_exact(&mut file_buffer)?;
 
         let header: Header = StreamFile::parse_header(&file_buffer)?;
 
