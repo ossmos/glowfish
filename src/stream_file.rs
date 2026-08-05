@@ -431,6 +431,7 @@ impl TryFrom<&Path> for StreamFile {
                 .try_into()
                 .expect("Parsing header size to i32 failed"),
         );
+        file.rewind()?;
         let mut file_buffer = vec![0; header_size as usize];
         let _ = file.read_exact(&mut file_buffer);
 
