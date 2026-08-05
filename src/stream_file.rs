@@ -307,8 +307,8 @@ impl HeaderBuilder {
             compression_time: self
                 .compression_time
                 .ok_or(ParseError::MissingKey("comratio"))?,
-            avg_time: self.avg_time.ok_or(ParseError::MissingKey("auxpara1"))?,
-            avg_frq: self.avg_frq.ok_or(ParseError::MissingKey("auxpara2"))?,
+            avg_time: self.avg_time.unwrap_or(0),
+            avg_frq: self.avg_frq.unwrap_or(0),
             spec_duration: self
                 .spec_duration
                 .ok_or(ParseError::MissingKey("framedur"))?,
