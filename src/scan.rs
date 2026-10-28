@@ -1,26 +1,22 @@
+use rayon::prelude::*;
 use std::path::Path;
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
 
 use crate::{error::StoreError, metadata::StreamFileMetadata};
 use analyzer_files::StreamFile;
 
 pub fn scan_dir(root: &Path, follow_links: bool) -> Result<Vec<StreamFileMetadata>, StoreError> {
-    let mut out = vec![];
-
-    for entry in WalkDir::new(root)
+    let files: Vec<DirEntry> = WalkDir::new(root)
         .min_depth(1)
         .follow_links(follow_links)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
-    {
-        let path = entry.path();
-
-        let Ok(stream_file) = StreamFile::try_from(path) else {
-            continue;
-        };
-        let metadata = StreamFileMetadata::from(stream_file);
-        out.push(metadata);
-    }
-    Ok(out)
+        .collect();
+    let results: Vec<StreamFileMetadata> = files
+        .par_iter()
+        .filter_map(|f| StreamFile::try_from(f.path()).ok())
+        .map(StreamFileMetadata::from)
+        .collect();
+    Ok(results)
 }
