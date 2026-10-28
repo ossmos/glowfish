@@ -1,0 +1,3 @@
+[workspace]
+resolver = "3"
+members = ["crates/visualization", "crates/analyzer-files", "crates/stream-metadata-cache"]
