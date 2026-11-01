@@ -15,8 +15,8 @@ pub fn scan_dir(root: &Path, follow_links: bool) -> Result<Vec<StreamFileMetadat
         .collect();
     let results: Vec<StreamFileMetadata> = files
         .par_iter()
-        .filter_map(|f| StreamFile::try_from(f.path()).ok())
-        .map(StreamFileMetadata::from)
+        .filter_map(|f| StreamFile::open(f.path()).ok())
+        .filter_map(|f| StreamFileMetadata::try_from(&f).ok())
         .collect();
     Ok(results)
 }

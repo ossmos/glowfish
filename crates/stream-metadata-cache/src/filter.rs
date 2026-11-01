@@ -68,11 +68,19 @@ impl StringColumn {
 
 pub struct Columns {
     pub process: IntColumn,
+    pub project_id: IntColumn,
+    pub channel: IntColumn,
+    pub datamode: IntColumn,
+    pub datatype: IntColumn,
     pub filepath: StringColumn,
 }
 
 pub const COLUMNS: Columns = Columns {
     process: IntColumn { name: "process" },
+    project_id: IntColumn { name: "project_id" },
+    channel: IntColumn { name: "channel" },
+    datamode: IntColumn { name: "datamode" },
+    datatype: IntColumn { name: "datatype" },
     filepath: StringColumn { name: "filepath" },
 };
 

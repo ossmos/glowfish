@@ -85,8 +85,11 @@ impl MetadataStore for SqliteStore {
                     project_id,
                     channel,
                     process,
-                    process_time,
+                    datamode,
+                    datatype,
+                    datakind,
                     process_datetime,
+                    measure_start,
                     db_header_size,
                     bytes_per_sample,
                     db_size,
@@ -99,17 +102,15 @@ impl MetadataStore for SqliteStore {
                     frq_start,
                     frq_end,
                     frq_per_band,
+                    adc_type,
                     bit_resolution,
                     fft_log_shift,
                     streamno,
                     preamp_gain,
                     file_size,
                     db_count,
-                    db_sample_count,
-                    db_spec_count,
-                    sample_count,
                     spec_count
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         "#,
                     )
             .bind(&f.filepath)
@@ -117,8 +118,11 @@ impl MetadataStore for SqliteStore {
             .bind(f.project_id as i64)
             .bind(f.channel)
             .bind(f.process)
-            .bind(f.process_time)
+            .bind(f.datamode)
+            .bind(f.datatype)
+            .bind(f.datakind)
             .bind(f.process_datetime)
+            .bind(f.measure_start)
             .bind(f.db_header_size)
             .bind(f.bytes_per_sample)
             .bind(f.db_size)
@@ -127,20 +131,18 @@ impl MetadataStore for SqliteStore {
             .bind(f.compression_frq)
             .bind(f.avg_time)
             .bind(f.avg_frq)
-            .bind(f.spec_duration as i64)
+            .bind(f.spec_duration)
             .bind(f.frq_start)
             .bind(f.frq_end)
             .bind(f.frq_per_band)
+            .bind(f.adc_type)
             .bind(f.bit_resolution)
             .bind(f.fft_log_shift)
             .bind(f.streamno)
             .bind(f.preamp_gain)
             .bind(f.file_size as i64)
-            .bind(f.db_count)
-            .bind(f.db_sample_count)
-            .bind(f.db_spec_count)
-            .bind(f.sample_count)
-            .bind(f.spec_count)
+            .bind(f.db_count as i64)
+            .bind(f.spec_count as i64)
             .execute(&mut *tx)
             .await?;
         }
@@ -251,8 +253,11 @@ mod tests {
                 project_id: 10000000,
                 channel: 1,
                 process: i,
-                process_time: 1,
+                datamode: 2,
+                datatype: 0,
+                datakind: -1,
                 process_datetime: Utc::now(),
+                measure_start: None,
                 db_header_size: 1,
                 bytes_per_sample: 2,
                 db_size: 1,
@@ -261,21 +266,17 @@ mod tests {
                 compression_frq: 1,
                 avg_time: 1,
                 avg_frq: 1,
-                spec_duration: 1,
-                frq_start: 0,
-                frq_end: 512,
-                frq_per_band: 1,
-                //adc_type: stream_file.//adc_type,
-                bit_resolution: 2,
-                fft_log_shift: 2,
-                //max_amplitude_level
-                streamno: 0,
+                spec_duration: 81920.0,
+                frq_start: 0.0,
+                frq_end: 780800.0,
+                frq_per_band: 1525.0,
+                adc_type: 1,
+                bit_resolution: 16,
+                fft_log_shift: 14,
+                streamno: None,
                 preamp_gain: 1,
                 file_size: 0,
                 db_count: 1,
-                db_sample_count: 1,
-                db_spec_count: 1,
-                sample_count: 1,
                 spec_count: 1,
             })
             .collect();
