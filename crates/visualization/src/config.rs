@@ -19,6 +19,16 @@ pub enum CellValue {
     Range,
 }
 
+/// What is shown around the plot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Layout {
+    /// Buttons, timeline and hover readout for working with the data.
+    #[default]
+    Interactive,
+    /// Only the plot, legend and labels, e.g. for exported images.
+    Report,
+}
+
 /// Mouse buttons of the view controls. The default is map style: the data is dragged under a
 /// fixed camera with the left button and the view is rotated with the right button.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,8 +59,8 @@ pub struct Perspective {
 impl Default for Perspective {
     fn default() -> Self {
         Self {
-            yaw: -0.5,
-            pitch: 0.6,
+            yaw: (-30.0f32).to_radians(),
+            pitch: 35.0f32.to_radians(),
             distance: 22.0,
         }
     }
@@ -65,6 +75,7 @@ pub struct VisualizationConfig {
     pub scaling: Scaling,
     pub controls: Controls,
     pub perspective: Perspective,
+    pub layout: Layout,
 }
 
 impl Default for VisualizationConfig {
@@ -76,6 +87,7 @@ impl Default for VisualizationConfig {
             scaling: Scaling::default(),
             controls: Controls::default(),
             perspective: Perspective::default(),
+            layout: Layout::default(),
         }
     }
 }

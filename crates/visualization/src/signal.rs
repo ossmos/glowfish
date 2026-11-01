@@ -9,11 +9,13 @@ use crate::camera::{BlocksViewInput, ZOOM_STEP, cursor_over_ui};
 use crate::colormap::PLACEHOLDER;
 use crate::spectrogram::value_range;
 use crate::{
-    DataKind, Dataset, DisplayedGrid, Selection, VisualizationConfig, VisualizationEntity,
+    DataKind, Dataset, DisplayedGrid, Layout, Selection, VisualizationConfig, VisualizationEntity,
 };
 
 /// Space around the plot in logical pixels: left, right, top, bottom (the timeline is below).
 pub const PLOT_MARGIN: [f32; 4] = [70.0, 70.0, 60.0, 150.0];
+/// Bottom margin without a timeline.
+const REPORT_BOTTOM_MARGIN: f32 = 50.0;
 const LINE_COLOR: Color = Color::srgb(0.35, 0.63, 0.9);
 const BACKGROUND: Color = Color::srgb(0.12, 0.12, 0.13);
 const MIN_THICKNESS: f32 = 1.0;
@@ -42,11 +44,15 @@ fn is_signal(dataset: Option<Res<Dataset>>) -> bool {
     dataset.is_some_and(|d| d.kind == DataKind::Signal)
 }
 
-/// The plot rectangle in world coordinates of the default 2D camera (origin at the window
-/// centre, y up, one unit per logical pixel).
-pub fn plot_rect(window_size: Vec2) -> Rect {
-    let [left, right, top, bottom] = PLOT_MARGIN;
-    let half = window_size / 2.0;
+/// The plot rectangle in world coordinates of the default 2D camera (origin at the centre of
+/// the target, y up, one unit per logical pixel).
+/// Margins are scaled by `ui_scale` like the labels around the plot.
+pub fn plot_rect(target_size: Vec2, layout: Layout, ui_scale: f32) -> Rect {
+    let [left, right, top, mut bottom] = PLOT_MARGIN.map(|m| m * ui_scale);
+    if layout == Layout::Report {
+        bottom = REPORT_BOTTOM_MARGIN * ui_scale;
+    }
+    let half = target_size / 2.0;
     let min = Vec2::new(-half.x + left, -half.y + bottom);
     let max = Vec2::new(half.x - right, half.y - top);
     Rect::from_corners(min, max.max(min + 1.0))
@@ -60,31 +66,58 @@ fn spawn_signal(
     commands.spawn((
         SignalView,
         VisualizationEntity,
-        Mesh2d(meshes.add(Mesh::new(
-            PrimitiveTopology::TriangleList,
-            RenderAssetUsages::default(),
+        // a mesh with all attributes from the start: an empty mesh would specialize a render
+        // pipeline for a vertex layout without positions, which fails to compile
+        Mesh2d(meshes.add(envelope_mesh(
+            &Grid {
+                range: 0..0,
+                level: 0,
+                first_cell: 0,
+                time_cells: 0,
+                freq_cells: 1,
+                bands_per_cell: 1,
+                bands: 1,
+                cells: Vec::new(),
+            },
+            &Selection::new(0.0, 1.0),
+            ValueRange::new(0.0, 1.0),
+            Rect::new(0.0, 0.0, 0.0, 0.0),
         ))),
         MeshMaterial2d(materials.add(ColorMaterial::default())),
     ));
 }
 
+#[allow(clippy::too_many_arguments)]
 fn update_signal(
     dataset: Res<Dataset>,
     config: Res<VisualizationConfig>,
     selection: Option<Res<Selection>>,
     displayed: Option<Res<DisplayedGrid>>,
-    window: Single<Ref<Window>>,
+    cameras: Query<&Camera, With<Camera2d>>,
+    ui_scale: Res<UiScale>,
     views: Query<&Mesh2d, With<SignalView>>,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut last_size: Local<Option<Vec2>>,
 ) {
     let (Some(selection), Some(displayed)) = (selection, displayed) else {
         return;
     };
-    if !selection.is_changed() && !displayed.is_changed() && !window.is_changed() {
+    // the window or the export image; unknown until the camera's target is set up
+    let Some(size) = cameras.iter().find_map(Camera::logical_viewport_size) else {
+        return;
+    };
+    let resized = *last_size != Some(size);
+    if !selection.is_changed()
+        && !displayed.is_changed()
+        && !config.is_changed()
+        && !ui_scale.is_changed()
+        && !resized
+    {
         return;
     }
+    *last_size = Some(size);
     let range = value_range(config.scaling, dataset.full_scale, &displayed.grid);
-    let rect = plot_rect(window.size());
+    let rect = plot_rect(size, config.layout, ui_scale.0);
     for mesh in &views {
         if let Some(mut mesh) = meshes.get_mut(&mesh.0) {
             *mesh = envelope_mesh(&displayed.grid, &selection, range, rect);
@@ -162,6 +195,7 @@ fn signal_input(
     motion: Res<AccumulatedMouseMotion>,
     scroll: Res<AccumulatedMouseScroll>,
     window: Single<&Window>,
+    ui_scale: Res<UiScale>,
     nodes: Query<(&ComputedNode, &UiGlobalTransform, &InheritedVisibility), With<BlocksViewInput>>,
     mut dragging: Local<bool>,
     selection: Option<ResMut<Selection>>,
@@ -169,7 +203,7 @@ fn signal_input(
     let Some(mut selection) = selection else {
         return;
     };
-    let rect = plot_rect(window.size());
+    let rect = plot_rect(window.size(), Layout::Interactive, ui_scale.0);
     let cursor = window.cursor_position();
     let over_ui = cursor.is_some_and(|c| cursor_over_ui(c, &window, &nodes));
     if buttons.just_pressed(config.controls.pan) {
@@ -193,7 +227,7 @@ fn signal_input(
             MouseScrollUnit::Pixel => scroll.delta.y / 40.0,
         };
         // cursor x in plot space: logical pixels from the left window edge
-        let at = ((cursor.x - PLOT_MARGIN[0]) / rect.width()).clamp(0.0, 1.0) as f64;
+        let at = ((cursor.x - PLOT_MARGIN[0] * ui_scale.0) / rect.width()).clamp(0.0, 1.0) as f64;
         moved = moved.zoomed(at, ZOOM_STEP.powf(lines as f64), dataset.rows());
     }
     if moved != *selection {
@@ -256,7 +290,7 @@ mod tests {
 
     #[test]
     fn plot_rect_respects_margins() {
-        let rect = plot_rect(Vec2::new(1000.0, 800.0));
+        let rect = plot_rect(Vec2::new(1000.0, 800.0), Layout::Interactive, 1.0);
         assert_eq!(rect.min, Vec2::new(-430.0, -250.0));
         assert_eq!(rect.max, Vec2::new(430.0, 340.0));
     }

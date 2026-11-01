@@ -18,10 +18,15 @@ use bevy::prelude::*;
 use bevy::winit::WinitSettings;
 
 pub use camera::{BlocksViewInput, ViewRig};
-pub use config::{CellValue, Controls, DisplayMode, Perspective, VisualizationConfig};
+pub use config::{CellValue, Controls, DisplayMode, Layout, Perspective, VisualizationConfig};
 pub use dataset::{DataKind, Dataset, Selection};
 pub use loading::{DataPlugin, DataSystems, DisplayedGrid, Loading, grid_size};
 pub use spectrogram::SpectrogramMaterial;
+
+/// Render into this image instead of the window, e.g. for offscreen exports. Insert it before the
+/// dataset; the image needs `RENDER_ATTACHMENT` usage (`Image::new_target_texture`).
+#[derive(Resource, Debug, Clone)]
+pub struct RenderToImage(pub Handle<Image>);
 
 /// Everything spawned for the current dataset; despawned when the dataset changes.
 #[derive(Component, Default)]

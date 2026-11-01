@@ -1,9 +1,13 @@
+use bevy::camera::RenderTarget;
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll, MouseScrollUnit};
 use bevy::prelude::*;
-use bevy::ui::{ComputedNode, UiGlobalTransform};
+use bevy::ui::{ComputedNode, IsDefaultUiCamera, UiGlobalTransform};
 
 use crate::layout::{FREQ_EXTENT, TIME_EXTENT};
-use crate::{DataKind, Dataset, Perspective, Selection, VisualizationConfig, VisualizationEntity};
+use crate::{
+    DataKind, Dataset, Perspective, RenderToImage, Selection, VisualizationConfig,
+    VisualizationEntity,
+};
 
 const MIN_PITCH: f32 = 0.05;
 const MAX_PITCH: f32 = 1.5;
@@ -65,16 +69,15 @@ impl Plugin for ViewCameraPlugin {
     }
 }
 
-fn spawn_camera(mut commands: Commands, dataset: Res<Dataset>, config: Res<VisualizationConfig>) {
-    match dataset.kind {
+fn spawn_camera(
+    mut commands: Commands,
+    dataset: Res<Dataset>,
+    config: Res<VisualizationConfig>,
+    target: Option<Res<RenderToImage>>,
+) {
+    let camera = match dataset.kind {
         DataKind::Spectrogram => {
             let rig = ViewRig::new(config.perspective);
-            commands.spawn((
-                Camera3d::default(),
-                rig.transform(),
-                rig,
-                VisualizationEntity,
-            ));
             commands.spawn((
                 DirectionalLight {
                     illuminance: 4_000.0,
@@ -83,10 +86,23 @@ fn spawn_camera(mut commands: Commands, dataset: Res<Dataset>, config: Res<Visua
                 Transform::from_xyz(4.0, 10.0, 6.0).looking_at(Vec3::ZERO, Vec3::Y),
                 VisualizationEntity,
             ));
+            commands
+                .spawn((
+                    Camera3d::default(),
+                    rig.transform(),
+                    rig,
+                    VisualizationEntity,
+                ))
+                .id()
         }
-        DataKind::Signal => {
-            commands.spawn((Camera2d, VisualizationEntity));
-        }
+        DataKind::Signal => commands.spawn((Camera2d, VisualizationEntity)).id(),
+    };
+    if let Some(target) = target {
+        // without a window the UI needs to be told which camera to use
+        commands.entity(camera).insert((
+            RenderTarget::Image(target.0.clone().into()),
+            IsDefaultUiCamera,
+        ));
     }
 }
 

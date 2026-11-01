@@ -8,7 +8,8 @@ use crate::camera::BlocksViewInput;
 use crate::colormap::{rgba8, viridis};
 use crate::spectrogram::value_range;
 use crate::{
-    Dataset, DisplayedGrid, Loading, Selection, VisualizationConfig, VisualizationEntity, format,
+    Dataset, DisplayedGrid, Layout, Loading, Selection, VisualizationConfig, VisualizationEntity,
+    format,
 };
 
 /// Height of the timeline panel in logical pixels.
@@ -88,8 +89,12 @@ impl Plugin for TimelinePlugin {
 fn spawn_timeline(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
+    config: Res<VisualizationConfig>,
     dataset: Res<Dataset>,
 ) {
+    if config.layout != Layout::Interactive {
+        return;
+    }
     let height = dataset.bands().min(OVERVIEW_BANDS);
     let image = images.add(Image::new(
         Extent3d {

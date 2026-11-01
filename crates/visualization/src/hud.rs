@@ -13,7 +13,7 @@ use crate::signal::{PLOT_MARGIN, plot_rect};
 use crate::spectrogram::value_range;
 use crate::timeline::TIMELINE_HEIGHT;
 use crate::{
-    DataKind, Dataset, DisplayMode, DisplayedGrid, Selection, VisualizationConfig,
+    DataKind, Dataset, DisplayMode, DisplayedGrid, Layout, Selection, VisualizationConfig,
     VisualizationEntity, format,
 };
 
@@ -34,6 +34,9 @@ struct LegendLabel {
 #[derive(Component)]
 struct Readout;
 
+#[derive(Component)]
+struct Title;
+
 /// The colour bar of the legend; only meaningful for spectrograms.
 #[derive(Component)]
 struct LegendBar;
@@ -46,7 +49,8 @@ impl Plugin for HudPlugin {
             Update,
             (
                 spawn_hud.run_if(resource_changed::<Dataset>),
-                (style_buttons, update_legend, update_readout).after(crate::DataSystems),
+                (style_buttons, update_legend, update_readout, update_title)
+                    .after(crate::DataSystems),
             )
                 .chain()
                 .run_if(resource_exists::<Dataset>),
@@ -86,7 +90,15 @@ fn button(label: &str) -> impl Bundle {
     )
 }
 
-fn spawn_hud(mut commands: Commands, dataset: Res<Dataset>, mut images: ResMut<Assets<Image>>) {
+fn spawn_hud(
+    mut commands: Commands,
+    dataset: Res<Dataset>,
+    config: Res<VisualizationConfig>,
+    mut images: ResMut<Assets<Image>>,
+) {
+    let interactive = config.layout == Layout::Interactive;
+    // the timeline only exists in the interactive layout
+    let bottom = if interactive { TIMELINE_HEIGHT } else { 0.0 };
     let legend = images.add(Image::new(
         Extent3d {
             width: 1,
@@ -102,8 +114,19 @@ fn spawn_hud(mut commands: Commands, dataset: Res<Dataset>, mut images: ResMut<A
         RenderAssetUsages::RENDER_WORLD,
     ));
 
-    // top left: display mode (spectrograms only)
-    if dataset.kind == DataKind::Spectrogram {
+    // top left: display mode (spectrograms only), or the title of a report
+    if !interactive {
+        commands.spawn((
+            VisualizationEntity,
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(14),
+                top: px(12),
+                ..default()
+            },
+            children![(Title, text("", 16.0))],
+        ));
+    } else if dataset.kind == DataKind::Spectrogram {
         commands.spawn((
             VisualizationEntity,
             Node {
@@ -129,17 +152,19 @@ fn spawn_hud(mut commands: Commands, dataset: Res<Dataset>, mut images: ResMut<A
     }
 
     // top right: export
-    commands.spawn((
-        VisualizationEntity,
-        Node {
-            position_type: PositionType::Absolute,
-            right: px(10),
-            top: px(10),
-            column_gap: px(6),
-            ..default()
-        },
-        children![(button("PNG"), observe(export_png))],
-    ));
+    if interactive {
+        commands.spawn((
+            VisualizationEntity,
+            Node {
+                position_type: PositionType::Absolute,
+                right: px(10),
+                top: px(10),
+                column_gap: px(6),
+                ..default()
+            },
+            children![(button("PNG"), observe(export_png))],
+        ));
+    }
 
     // right: colour legend
     commands.spawn((
@@ -148,7 +173,7 @@ fn spawn_hud(mut commands: Commands, dataset: Res<Dataset>, mut images: ResMut<A
             position_type: PositionType::Absolute,
             right: px(14),
             top: px(52),
-            bottom: px(TIMELINE_HEIGHT + 40.0),
+            bottom: px(bottom + 40.0),
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::End,
             row_gap: px(4),
@@ -188,21 +213,56 @@ fn spawn_hud(mut commands: Commands, dataset: Res<Dataset>, mut images: ResMut<A
         DataKind::Spectrogram => "time: right   frequency: depth   amplitude: up",
         DataKind::Signal => "time: right   amplitude: up",
     };
-    commands.spawn((
-        VisualizationEntity,
-        Node {
-            position_type: PositionType::Absolute,
-            left: px(10),
-            bottom: px(TIMELINE_HEIGHT + 8.0),
-            flex_direction: FlexDirection::Column,
-            row_gap: px(4),
-            ..default()
-        },
-        children![
-            colored_text(axes, 13.0, Color::srgb(0.65, 0.65, 0.65)),
-            (Readout, text("", 14.0)),
-        ],
-    ));
+    let labels = commands
+        .spawn((
+            VisualizationEntity,
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(10),
+                bottom: px(bottom + 8.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: px(4),
+                ..default()
+            },
+            children![colored_text(axes, 13.0, Color::srgb(0.65, 0.65, 0.65))],
+        ))
+        .id();
+    if interactive {
+        commands
+            .entity(labels)
+            .with_child((Readout, text("", 14.0)));
+    }
+}
+
+/// Report title: file name, time range and frequency range.
+fn update_title(
+    dataset: Res<Dataset>,
+    selection: Option<Res<Selection>>,
+    mut titles: Query<&mut Text, With<Title>>,
+) {
+    let Some(selection) = selection else { return };
+    if !selection.is_changed() && !dataset.is_changed() {
+        return;
+    }
+    let mut parts = vec![
+        dataset.name.clone(),
+        format!(
+            "{} - {}",
+            format::milliseconds(dataset.row_time_ms(selection.start)),
+            format::milliseconds(dataset.row_time_ms(selection.end)),
+        ),
+    ];
+    if dataset.kind == DataKind::Spectrogram {
+        parts.push(format!(
+            "{} - {}",
+            format::frequency(dataset.band_frequency(0.0)),
+            format::frequency(dataset.band_frequency(dataset.bands() as f64)),
+        ));
+    }
+    let title = parts.join("    ");
+    for mut text in &mut titles {
+        text.0.clone_from(&title);
+    }
 }
 
 fn set_mode(mode: DisplayMode) -> impl FnMut(On<Activate>, ResMut<VisualizationConfig>) {
@@ -286,6 +346,7 @@ fn update_readout(
     selection: Option<Res<Selection>>,
     displayed: Option<Res<DisplayedGrid>>,
     window: Single<&Window>,
+    ui_scale: Res<UiScale>,
     cameras: Query<(&Camera, &GlobalTransform), With<ViewRig>>,
     mut readouts: Query<&mut Text, With<Readout>>,
 ) {
@@ -307,8 +368,8 @@ fn update_readout(
             })
         }
         DataKind::Signal => {
-            let rect = plot_rect(window.size());
-            let x = (cursor.x - PLOT_MARGIN[0]) / rect.width();
+            let rect = plot_rect(window.size(), Layout::Interactive, ui_scale.0);
+            let x = (cursor.x - PLOT_MARGIN[0] * ui_scale.0) / rect.width();
             (0.0..=1.0)
                 .contains(&x)
                 .then(|| (selection.start + x as f64 * selection.span(), 0))

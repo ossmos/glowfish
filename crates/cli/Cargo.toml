@@ -1,0 +1,21 @@
+[package]
+name = "cli"
+version = "0.1.0"
+edition = "2024"
+description = "Command line interface of glowfish: open the viewer or export images"
+
+[[bin]]
+name = "glowfish"
+path = "src/main.rs"
+
+[dependencies]
+analyzer-files = { version = "0.1.0", path = "../analyzer-files" }
+anyhow = "1.0.104"
+bevy = "0.20.1"
+clap = { version = "4.6.7", features = ["derive"] }
+directories = "6.0.0"
+glowfish-data = { version = "0.1.0", path = "../glowfish-data" }
+rfd = "0.17.2"
+serde = { version = "1.0.229", features = ["derive"] }
+toml = "1.1.8"
+visualization = { version = "0.1.0", path = "../visualization" }
