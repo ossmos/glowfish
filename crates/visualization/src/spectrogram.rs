@@ -149,13 +149,17 @@ fn data_image(time: usize, freq: usize) -> Image {
     )
 }
 
-/// Swaps the mesh when the display mode or the cell budget changes.
+/// Swaps the mesh when the display mode or the cell budget changes, and replaces the data
+/// texture when the budget needs a different size.
+#[allow(clippy::too_many_arguments)]
 fn update_mesh(
     dataset: Res<Dataset>,
     config: Res<VisualizationConfig>,
     mut cache: ResMut<SpectrogramMeshes>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut views: Query<&mut Mesh3d, With<SpectrogramView>>,
+    mut images: ResMut<Assets<Image>>,
+    mut materials: ResMut<Assets<SpectrogramMaterial>>,
+    mut views: Query<(&mut Mesh3d, &MeshMaterial3d<SpectrogramMaterial>), With<SpectrogramView>>,
     added: Query<(), Added<SpectrogramView>>,
 ) {
     if !config.is_changed() && added.is_empty() {
@@ -175,9 +179,17 @@ fn update_mesh(
             .get_or_insert_with(|| meshes.add(surface_mesh(dims.0, dims.1)))
             .clone(),
     };
-    for mut mesh in &mut views {
+    for (mut mesh, material) in &mut views {
         if mesh.0 != handle {
             mesh.0 = handle.clone();
+        }
+        let Some(mut material) = materials.get_mut(&material.0) else {
+            continue;
+        };
+        let size = images.get(&material.data).map(|i| i.size());
+        if size != Some(UVec2::new(dims.0 as u32, dims.1 as u32)) {
+            // filled by update_data, which runs right after this system
+            material.data = images.add(data_image(dims.0, dims.1));
         }
     }
 }
