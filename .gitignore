@@ -4,3 +4,6 @@
 
 *.zip
 *.py
+
+# documentation build
+/site

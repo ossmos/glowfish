@@ -305,6 +305,15 @@ mod tests {
     }
 
     #[test]
+    fn documentation_shows_the_default_file() {
+        let page = include_str!("../../../docs/configuration.md");
+        assert!(
+            page.contains(&format!("```toml\n{DEFAULT_CONFIG}```")),
+            "update the defaults in docs/configuration.md"
+        );
+    }
+
+    #[test]
     fn partial_files_keep_defaults() {
         let config = Config::parse("[view]\nmode = \"cubes\"\n").unwrap();
         assert_eq!(config.view.mode, Mode::Cubes);
