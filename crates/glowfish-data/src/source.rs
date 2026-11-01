@@ -29,3 +29,17 @@ impl Source for StreamFile {
         Ok(self.read_f32(range, out)?)
     }
 }
+
+impl<S: Source + ?Sized> Source for Box<S> {
+    fn rows(&self) -> u64 {
+        (**self).rows()
+    }
+
+    fn bands(&self) -> usize {
+        (**self).bands()
+    }
+
+    fn read(&self, range: Range<u64>, out: &mut Vec<f32>) -> Result<(), DataError> {
+        (**self).read(range, out)
+    }
+}

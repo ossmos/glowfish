@@ -18,6 +18,10 @@ const MAX_LEVEL: u32 = 55;
 const DIRECT_MAX_LEVEL: u32 = 4;
 /// Rows read from the source at once when reducing directly.
 const READ_ROWS: u64 = 1024;
+/// A query caches tiles of its own level and of this many finer levels, so zooming in a few
+/// steps is served from the cache. Finer tiles are intermediate results: a whole-file query
+/// produces thousands of them, and caching them would evict the few coarse tiles that matter.
+const CACHED_FINER_LEVELS: u32 = 3;
 
 /// A lazily built mipmap over the time axis of a [`Source`].
 ///
@@ -146,6 +150,7 @@ impl<S: Source, D: Downsampler> Pyramid<S, D> {
         let load = Load {
             control,
             query: range.clone(),
+            level: self.level_for(&range, time_cells),
         };
         let grid = self
             .pool
@@ -287,10 +292,12 @@ impl<S: Source, D: Downsampler> Pyramid<S, D> {
             self.merge(earlier?, later?, want)
         };
         let tile = Arc::new(tile);
-        self.cache
-            .lock()
-            .expect("cache lock poisoned")
-            .insert(level, index, tile.clone());
+        if level + CACHED_FINER_LEVELS >= load.level {
+            self.cache
+                .lock()
+                .expect("cache lock poisoned")
+                .insert(level, index, tile.clone());
+        }
         Ok(Some(tile))
     }
 
@@ -705,6 +712,21 @@ mod tests {
             assert_matches_brute_force(pyramid.source(), &grid);
             assert!(pyramid.cached_bytes() <= 3 * tile_bytes);
         }
+    }
+
+    #[test]
+    fn whole_file_queries_keep_their_coarse_tiles() {
+        // a budget for only a few tiles: fine intermediate tiles must not evict the coarse ones
+        let tile_bytes = TILE_CELLS as usize * 4 * size_of::<MinMaxCell>();
+        let pyramid: Pyramid<_> = Pyramid::new(
+            VecSource::new(1_000_000, 4, value),
+            8 * tile_bytes,
+            LoadPool::new(2),
+        );
+        pyramid.query(0..1_000_000, 100, 4).unwrap();
+        let grid = pyramid.peek(0..1_000_000, 100, 4);
+        assert!(grid.cells.iter().all(|c| !c.is_empty()));
+        assert_matches_brute_force(pyramid.source(), &grid);
     }
 
     #[test]

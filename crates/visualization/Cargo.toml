@@ -5,3 +5,5 @@ edition = "2024"
 
 [dependencies]
 analyzer-files = { path = "../analyzer-files/" }
+glowfish-data = { path = "../glowfish-data/" }
+bevy = "0.20.1"

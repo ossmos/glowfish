@@ -19,9 +19,18 @@ impl LoadPool {
         } else {
             threads
         };
-        let pool = rayon::ThreadPoolBuilder::new()
+        let builder = rayon::ThreadPoolBuilder::new();
+        // the browser has no threads: the calling thread is the only worker and runs all jobs
+        #[cfg(target_arch = "wasm32")]
+        let builder = {
+            let _ = threads;
+            builder.num_threads(1).use_current_thread()
+        };
+        #[cfg(not(target_arch = "wasm32"))]
+        let builder = builder
             .num_threads(threads)
-            .thread_name(|i| format!("glowfish-load-{i}"))
+            .thread_name(|i| format!("glowfish-load-{i}"));
+        let pool = builder
             .build()
             .expect("creating the load thread pool failed");
         Self(Arc::new(pool))
@@ -119,6 +128,8 @@ impl LoadControl {
 pub(crate) struct Load<'a> {
     pub control: &'a LoadControl,
     pub query: Range<u64>,
+    /// Pyramid level of the query.
+    pub level: u32,
 }
 
 impl Load<'_> {
@@ -147,6 +158,7 @@ mod tests {
         let load = Load {
             control: &control,
             query: 10..110,
+            level: 0,
         };
         load.advance(&(0..30));
         assert_eq!(control.rows_done(), 20);

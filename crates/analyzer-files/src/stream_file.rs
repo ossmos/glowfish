@@ -232,6 +232,11 @@ fn read_exact_at(file: &File, buf: &mut [u8], offset: u64) -> io::Result<()> {
     file.read_exact_at(buf, offset)
 }
 
+#[cfg(not(any(unix, windows)))]
+fn read_exact_at(_file: &File, _buf: &mut [u8], _offset: u64) -> io::Result<()> {
+    Err(io::ErrorKind::Unsupported.into())
+}
+
 #[cfg(windows)]
 fn read_exact_at(file: &File, mut buf: &mut [u8], mut offset: u64) -> io::Result<()> {
     use std::os::windows::fs::FileExt;

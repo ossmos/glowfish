@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use ring::digest::{SHA256, digest};
+use sha2::{Digest, Sha256};
 
 use crate::{AdcType, Datakind, Datamode, Datatype, ParseError};
 
@@ -459,10 +459,7 @@ impl RawHeader {
             streamno: self.streamno,
             preamp_gain: required(self.preamp_gain, "pampgain")?,
             flags,
-            hash: digest(&SHA256, buf)
-                .as_ref()
-                .try_into()
-                .expect("SHA-256 digests are 32 bytes"),
+            hash: Sha256::digest(buf).into(),
         })
     }
 }
