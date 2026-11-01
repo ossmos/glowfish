@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use bevy::ui::{ComputedNode, UiGlobalTransform};
 use glowfish_data::{Grid, MinMaxCell, ValueRange};
 
-use crate::camera::{BlocksViewInput, cursor_over_ui};
+use crate::camera::{BlocksViewInput, ZOOM_STEP, cursor_over_ui};
 use crate::colormap::PLACEHOLDER;
 use crate::spectrogram::value_range;
 use crate::{
@@ -194,18 +194,11 @@ fn signal_input(
         };
         // cursor x in plot space: logical pixels from the left window edge
         let at = ((cursor.x - PLOT_MARGIN[0]) / rect.width()).clamp(0.0, 1.0) as f64;
-        moved = zoom(moved, at, 0.85f64.powf(lines as f64), dataset.rows());
+        moved = moved.zoomed(at, ZOOM_STEP.powf(lines as f64), dataset.rows());
     }
     if moved != *selection {
         *selection = moved;
     }
-}
-
-/// Scales the selection by `factor` keeping the row at fraction `at` in place.
-pub fn zoom(selection: Selection, at: f64, factor: f64, rows: u64) -> Selection {
-    let pivot = selection.start + selection.span() * at;
-    let span = selection.span() * factor;
-    Selection::new(pivot - span * at, pivot - span * at + span).clamped(rows)
 }
 
 #[cfg(test)]
@@ -259,14 +252,6 @@ mod tests {
         // the empty cell is a placeholder in the middle
         assert_eq!(positions[12][1], 3.0);
         assert_eq!(positions[14][1], 7.0);
-    }
-
-    #[test]
-    fn zoom_keeps_the_pivot() {
-        let s = zoom(Selection::new(100.0, 200.0), 0.25, 0.5, 1000);
-        assert_eq!(s, Selection::new(112.5, 162.5));
-        let s = zoom(Selection::new(0.0, 100.0), 0.5, 100.0, 1000);
-        assert_eq!(s, Selection::all(1000));
     }
 
     #[test]

@@ -119,6 +119,15 @@ impl Selection {
         Self::new(self.start.max(0.0), self.end.min(total)).clamped(rows)
     }
 
+    /// Scales the selection by `factor` keeping the row at fraction `at` of the window in
+    /// place; `factor < 1` zooms in.
+    pub fn zoomed(self, at: f64, factor: f64, rows: u64) -> Self {
+        let at = at.clamp(0.0, 1.0);
+        let pivot = self.start + self.span() * at;
+        let span = self.span() * factor;
+        Self::new(pivot - span * at, pivot - span * at + span).clamped(rows)
+    }
+
     /// Moves the selection by `rows`, stopping at the borders of the data.
     pub fn shifted(self, rows: f64, total: u64) -> Self {
         Self::new(self.start + rows, self.end + rows).clamped(total)
@@ -161,6 +170,14 @@ mod tests {
         assert_eq!(s, Selection::new(0.0, 20.0));
         let s = Selection::new(10.0, 30.0).shifted(5.5, 100);
         assert_eq!(s, Selection::new(15.5, 35.5));
+    }
+
+    #[test]
+    fn zoom_keeps_the_pivot() {
+        let s = Selection::new(100.0, 200.0).zoomed(0.25, 0.5, 1000);
+        assert_eq!(s, Selection::new(112.5, 162.5));
+        let s = Selection::new(0.0, 100.0).zoomed(0.5, 100.0, 1000);
+        assert_eq!(s, Selection::all(1000));
     }
 
     #[test]

@@ -6,7 +6,7 @@ use bevy::render::view::screenshot::{Screenshot, save_to_disk};
 use bevy::ui_widgets::{Activate, Button, observe};
 use glowfish_data::{Grid, MinMaxCell};
 
-use crate::camera::{BlocksViewInput, ViewRig};
+use crate::camera::{BlocksViewInput, ViewRig, ground_point};
 use crate::colormap::{rgba8, viridis};
 use crate::layout::{FREQ_EXTENT, TIME_EXTENT};
 use crate::signal::{PLOT_MARGIN, plot_rect};
@@ -297,9 +297,7 @@ fn update_readout(
     let target = cursor.and_then(|cursor| match dataset.kind {
         DataKind::Spectrogram => {
             let (camera, transform) = cameras.single().ok()?;
-            let ray = camera.viewport_to_world(transform, cursor).ok()?;
-            let distance = ray.intersect_plane(Vec3::ZERO, InfinitePlane3d::new(Vec3::Y))?;
-            let point = ray.get_point(distance);
+            let point = ground_point(camera, transform, cursor)?;
             let inside =
                 (0.0..=TIME_EXTENT).contains(&point.x) && (0.0..=FREQ_EXTENT).contains(&point.z);
             inside.then(|| {

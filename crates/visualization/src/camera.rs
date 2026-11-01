@@ -10,6 +10,8 @@ const MAX_PITCH: f32 = 1.5;
 const MIN_DISTANCE: f32 = 3.0;
 const MAX_DISTANCE: f32 = 80.0;
 const ROTATE_SPEED: f32 = 0.006;
+/// Factor of the time window per wheel line when zooming in time.
+pub const ZOOM_STEP: f64 = 0.85;
 
 /// Orbit camera around a focus point on the ground plane. The camera itself never moves along
 /// the time axis: panning in time moves the data (the selection) instead.
@@ -125,52 +127,71 @@ fn track_drag(
     }
 }
 
+/// Rotate with the rotate button, pan along time with the pan button (the data under the cursor
+/// follows it), wheel zooms the camera, Ctrl + wheel zooms the time window around the cursor.
 #[allow(clippy::too_many_arguments)]
 fn view_input(
     drag: Res<ViewDrag>,
     config: Res<VisualizationConfig>,
     dataset: Res<Dataset>,
+    keys: Res<ButtonInput<KeyCode>>,
     motion: Res<AccumulatedMouseMotion>,
     scroll: Res<AccumulatedMouseScroll>,
     window: Single<&Window>,
     nodes: Query<(&ComputedNode, &UiGlobalTransform, &InheritedVisibility), With<BlocksViewInput>>,
-    mut rigs: Query<(&mut ViewRig, &Projection)>,
+    mut rigs: Query<(&mut ViewRig, &Projection, &Camera, &GlobalTransform)>,
     selection: Option<ResMut<Selection>>,
 ) {
     let Some(mut selection) = selection else {
         return;
     };
     let delta = motion.delta;
-    for (mut rig, projection) in &mut rigs {
+    let cursor = window.cursor_position();
+    let over_ui = cursor.is_some_and(|c| cursor_over_ui(c, &window, &nodes));
+    let lines = match scroll.unit {
+        MouseScrollUnit::Line => scroll.delta.y,
+        MouseScrollUnit::Pixel => scroll.delta.y / 40.0,
+    };
+    let zoom_time = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
+    let mut moved = *selection;
+    for (mut rig, projection, camera, camera_transform) in &mut rigs {
         if drag.0 == Some(config.controls.rotate) && delta != Vec2::ZERO {
             rig.yaw -= delta.x * ROTATE_SPEED;
             rig.pitch = (rig.pitch + delta.y * ROTATE_SPEED).clamp(MIN_PITCH, MAX_PITCH);
         }
         if drag.0 == Some(config.controls.pan) && delta != Vec2::ZERO {
             let world = pan_on_ground(&rig, projection, window.height(), delta);
-            // the data follows the cursor: dragging right shows earlier rows
-            let rows = -world.x as f64 / TIME_EXTENT as f64 * selection.span();
-            let moved = selection.shifted(rows, dataset.rows());
-            if moved != *selection {
-                *selection = moved;
+            // only along time: dragging right shows earlier rows
+            let rows = -world.x as f64 / TIME_EXTENT as f64 * moved.span();
+            moved = moved.shifted(rows, dataset.rows());
+        }
+        if lines != 0.0 && !over_ui {
+            if zoom_time {
+                // keep the time under the cursor in place; the view centre if it is off the data
+                let at = cursor
+                    .and_then(|c| ground_point(camera, camera_transform, c))
+                    .map_or(0.5, |p| (p.x / TIME_EXTENT) as f64);
+                moved = moved.zoomed(at, ZOOM_STEP.powf(lines as f64), dataset.rows());
+            } else {
+                rig.distance =
+                    (rig.distance * 0.9f32.powf(lines)).clamp(MIN_DISTANCE, MAX_DISTANCE);
             }
-            rig.focus.z = (rig.focus.z - world.y).clamp(0.0, FREQ_EXTENT);
         }
-        let over_ui = window
-            .cursor_position()
-            .is_some_and(|cursor| cursor_over_ui(cursor, &window, &nodes));
-        if scroll.delta.y != 0.0 && !over_ui {
-            let lines = match scroll.unit {
-                MouseScrollUnit::Line => scroll.delta.y,
-                MouseScrollUnit::Pixel => scroll.delta.y / 40.0,
-            };
-            rig.distance = (rig.distance * 0.9f32.powf(lines)).clamp(MIN_DISTANCE, MAX_DISTANCE);
-        }
+    }
+    if moved != *selection {
+        *selection = moved;
     }
 }
 
-/// A screen drag of `delta` pixels as a movement on the ground plane: x along time, y along
-/// frequency, scaled so the data under the cursor follows it.
+/// The point on the ground plane (y = 0) under `cursor`.
+pub fn ground_point(camera: &Camera, transform: &GlobalTransform, cursor: Vec2) -> Option<Vec3> {
+    let ray = camera.viewport_to_world(transform, cursor).ok()?;
+    let distance = ray.intersect_plane(Vec3::ZERO, InfinitePlane3d::new(Vec3::Y))?;
+    Some(ray.get_point(distance))
+}
+
+/// A screen drag of `delta` pixels as a movement on the ground plane (x along time, y along
+/// frequency), scaled so the data under the cursor follows it.
 pub fn pan_on_ground(
     rig: &ViewRig,
     projection: &Projection,

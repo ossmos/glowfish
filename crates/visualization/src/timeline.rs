@@ -43,9 +43,18 @@ const DRAG_THRESHOLD: f32 = 4.0;
 
 #[derive(Resource, Default)]
 struct TimelineDrag {
-    /// Press position as a fraction of the timeline width, and in pixels.
+    /// Moving the window (left button): the grabbed row's offset from the window start.
+    grab: Option<f64>,
+    /// Creating a window (right button): press position as a fraction of the timeline width,
+    /// and in pixels.
     anchor: Option<(f64, f32)>,
     last_press: Option<(f64, f64)>,
+}
+
+/// Where a window grabbed at `grab` rows after its start goes when the cursor is at `row`.
+fn moved_window(selection: Selection, grab: f64, row: f64, rows: u64) -> Selection {
+    let start = row - grab;
+    Selection::new(start, start + selection.span()).clamped(rows)
 }
 
 /// The selection while dragging from `anchor` to `current` (fractions of the timeline width,
@@ -307,8 +316,8 @@ fn update_progress(
     }
 }
 
-/// Dragging on the timeline selects a window (live), a double click selects the whole file.
-/// Moving the window is done by panning in the view.
+/// Left drag moves the window (a press outside of it centres it there first), right drag
+/// creates a new window, a double left click selects the whole file.
 fn timeline_input(
     time: Res<Time>,
     dataset: Res<Dataset>,
@@ -325,38 +334,59 @@ fn timeline_input(
         return;
     };
     let rows = dataset.rows();
-    // the cursor as (fraction of the strip width, logical x)
+    let total = rows as f64;
+    // the cursor as (fraction of the strip width, logical x); presses must be on the strip
     let cursor = window.cursor_position().and_then(|c| {
         let p = node.normalize_point(*transform, c * window.scale_factor())?;
         Some((p, (p.x as f64 + 0.5, c.x)))
     });
+    let pressed_on_strip = |button| {
+        buttons.just_pressed(button) && cursor.is_some_and(|(p, _)| p.abs().max_element() <= 0.5)
+    };
+    let mut moved = *selection;
 
-    if buttons.just_pressed(MouseButton::Left)
-        && let Some((_, at)) = cursor.filter(|(p, _)| p.abs().max_element() <= 0.5)
+    if pressed_on_strip(MouseButton::Left)
+        && let Some((_, at)) = cursor
     {
         let now = time.elapsed_secs_f64();
         let double = drag.last_press.is_some_and(|(last, last_at)| {
             now - last < DOUBLE_CLICK_SECS && (at.0 - last_at).abs() < 0.01
         });
-        if double {
-            *selection = Selection::all(rows);
-            drag.anchor = None;
-            drag.last_press = None;
-            return;
-        }
         drag.last_press = Some((now, at.0));
+        let row = at.0 * total;
+        if double {
+            moved = Selection::all(rows);
+            drag.grab = None;
+            drag.last_press = None;
+        } else if row >= moved.start && row <= moved.end {
+            drag.grab = Some(row - moved.start);
+        } else {
+            let grab = moved.span() / 2.0;
+            moved = moved_window(moved, grab, row, rows);
+            drag.grab = Some(grab);
+        }
+    }
+    if pressed_on_strip(MouseButton::Right)
+        && let Some((_, at)) = cursor
+    {
         drag.anchor = Some(at);
     }
     if !buttons.pressed(MouseButton::Left) {
-        drag.anchor = None;
-        return;
+        drag.grab = None;
     }
-    let (Some(anchor), Some((_, current))) = (drag.anchor, cursor) else {
-        return;
-    };
-    if let Some(moved) = drag_selection(anchor, current, rows)
-        && moved != *selection
+    if !buttons.pressed(MouseButton::Right) {
+        drag.anchor = None;
+    }
+
+    if let (Some(grab), Some((_, at))) = (drag.grab, cursor) {
+        moved = moved_window(moved, grab, at.0.clamp(0.0, 1.0) * total, rows);
+    }
+    if let (Some(anchor), Some((_, at))) = (drag.anchor, cursor)
+        && let Some(created) = drag_selection(anchor, at, rows)
     {
+        moved = created;
+    }
+    if moved != *selection {
         *selection = moved;
     }
 }
@@ -376,6 +406,21 @@ mod tests {
         assert_eq!(
             drag_selection((0.9, 900.0), (1.4, 1400.0), 1000),
             Some(Selection::new(900.0, 1000.0))
+        );
+    }
+
+    #[test]
+    fn moving_keeps_the_grabbed_row_under_the_cursor() {
+        let window = Selection::new(100.0, 300.0);
+        // grabbed 50 rows after the start, cursor now at row 600
+        assert_eq!(
+            moved_window(window, 50.0, 600.0, 1000),
+            Selection::new(550.0, 750.0)
+        );
+        // stops at the end of the file
+        assert_eq!(
+            moved_window(window, 50.0, 990.0, 1000),
+            Selection::new(800.0, 1000.0)
         );
     }
 
