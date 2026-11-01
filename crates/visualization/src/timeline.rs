@@ -37,18 +37,26 @@ struct TimelineLabel;
 #[derive(Resource)]
 struct OverviewImage(Handle<Image>);
 
+/// Pixels the cursor has to move before a press on the timeline becomes a selection; shorter
+/// movements are clicks (and double clicks) that keep the current window.
+const DRAG_THRESHOLD: f32 = 4.0;
+
 #[derive(Resource, Default)]
 struct TimelineDrag {
-    mode: Option<DragMode>,
+    /// Press position as a fraction of the timeline width, and in pixels.
+    anchor: Option<(f64, f32)>,
     last_press: Option<(f64, f64)>,
 }
 
-#[derive(Debug, Clone, Copy)]
-enum DragMode {
-    /// Selecting a new window from the anchor row.
-    Select { anchor: f64 },
-    /// Moving the window; the grabbed row's offset from the window start.
-    Move { grab: f64 },
+/// The selection while dragging from `anchor` to `current` (fractions of the timeline width,
+/// `x` in pixels for the threshold); `None` while the drag is still a click.
+fn drag_selection(anchor: (f64, f32), current: (f64, f32), rows: u64) -> Option<Selection> {
+    if (current.1 - anchor.1).abs() < DRAG_THRESHOLD {
+        return None;
+    }
+    let (a, b) = (anchor.0.clamp(0.0, 1.0), current.0.clamp(0.0, 1.0));
+    let total = rows as f64;
+    Some(Selection::new(a.min(b) * total, a.max(b) * total).clamped(rows))
 }
 
 pub struct TimelinePlugin;
@@ -299,8 +307,8 @@ fn update_progress(
     }
 }
 
-/// Drag on the timeline selects a window, drag inside the window moves it, a double click
-/// selects the whole file.
+/// Dragging on the timeline selects a window (live), a double click selects the whole file.
+/// Moving the window is done by panning in the view.
 fn timeline_input(
     time: Res<Time>,
     dataset: Res<Dataset>,
@@ -317,51 +325,38 @@ fn timeline_input(
         return;
     };
     let rows = dataset.rows();
-    let cursor = window.cursor_position().map(|c| c * window.scale_factor());
-    let position = cursor.and_then(|c| node.normalize_point(*transform, c));
-    let row_at = |p: Vec2| ((p.x as f64 + 0.5).clamp(0.0, 1.0)) * rows as f64;
+    // the cursor as (fraction of the strip width, logical x)
+    let cursor = window.cursor_position().and_then(|c| {
+        let p = node.normalize_point(*transform, c * window.scale_factor())?;
+        Some((p, (p.x as f64 + 0.5, c.x)))
+    });
 
     if buttons.just_pressed(MouseButton::Left)
-        && let Some(p) = position.filter(|p| p.abs().max_element() <= 0.5)
+        && let Some((_, at)) = cursor.filter(|(p, _)| p.abs().max_element() <= 0.5)
     {
         let now = time.elapsed_secs_f64();
-        let row = row_at(p);
-        let double = drag.last_press.is_some_and(|(at, last_row)| {
-            now - at < DOUBLE_CLICK_SECS && (row - last_row).abs() < rows as f64 * 0.01
+        let double = drag.last_press.is_some_and(|(last, last_at)| {
+            now - last < DOUBLE_CLICK_SECS && (at.0 - last_at).abs() < 0.01
         });
         if double {
             *selection = Selection::all(rows);
-            drag.mode = None;
+            drag.anchor = None;
             drag.last_press = None;
             return;
         }
-        drag.last_press = Some((now, row));
-        drag.mode = Some(if row >= selection.start && row <= selection.end {
-            DragMode::Move {
-                grab: row - selection.start,
-            }
-        } else {
-            DragMode::Select { anchor: row }
-        });
+        drag.last_press = Some((now, at.0));
+        drag.anchor = Some(at);
     }
     if !buttons.pressed(MouseButton::Left) {
-        drag.mode = None;
+        drag.anchor = None;
         return;
     }
-    let (Some(mode), Some(p)) = (drag.mode, position) else {
+    let (Some(anchor), Some((_, current))) = (drag.anchor, cursor) else {
         return;
     };
-    let row = row_at(p);
-    let moved = match mode {
-        DragMode::Select { anchor } => {
-            Selection::new(anchor.min(row), anchor.max(row)).clamped(rows)
-        }
-        DragMode::Move { grab } => {
-            let start = row - grab;
-            Selection::new(start, start + selection.span()).clamped(rows)
-        }
-    };
-    if moved != *selection {
+    if let Some(moved) = drag_selection(anchor, current, rows)
+        && moved != *selection
+    {
         *selection = moved;
     }
 }
@@ -369,6 +364,20 @@ fn timeline_input(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dragging_selects_and_clicks_keep_the_window() {
+        assert_eq!(drag_selection((0.2, 100.0), (0.21, 102.0), 1000), None);
+        assert_eq!(
+            drag_selection((0.5, 500.0), (0.25, 250.0), 1000),
+            Some(Selection::new(250.0, 500.0))
+        );
+        // dragging beyond the strip clamps to the file
+        assert_eq!(
+            drag_selection((0.9, 900.0), (1.4, 1400.0), 1000),
+            Some(Selection::new(900.0, 1000.0))
+        );
+    }
 
     #[test]
     fn overview_marks_unloaded_cells() {
