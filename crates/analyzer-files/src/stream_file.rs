@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::fs::File;
 use std::io::{self, Read};
 use std::ops::Range;
@@ -92,12 +93,7 @@ impl StreamFile {
 
     /// Reads the spectra (samples for signal files) in `range`.
     pub fn read(&self, range: Range<u64>) -> Result<StreamData, ReadError> {
-        if range.start > range.end || range.end > self.spec_count {
-            return Err(ReadError::OutOfRange {
-                range,
-                available: self.spec_count,
-            });
-        }
+        self.check_range(&range)?;
         let h = &self.header;
         let samples = match h.sample_type {
             SampleType::U16 => Samples::U16(self.read_samples(range.clone())?),
@@ -128,37 +124,89 @@ impl StreamFile {
         self.read(0..self.spec_count)
     }
 
+    /// Appends the spectra (samples for signal files) in `range` to `out`, converted to `f32`.
+    ///
+    /// Unlike [`read`](Self::read) this allocates nothing when `out` has enough capacity, which
+    /// matters when many threads read concurrently: large allocations are zero-filled by page
+    /// faults that serialize in the kernel. `u32` values above 2^24 are rounded.
+    pub fn read_f32(&self, range: Range<u64>, out: &mut Vec<f32>) -> Result<(), ReadError> {
+        self.check_range(&range)?;
+        out.reserve((range.end - range.start) as usize * self.header.frq_bands as usize);
+        match self.header.sample_type {
+            SampleType::U16 => self.for_each_chunk(range, |bytes| {
+                let (samples, _) = bytes.as_chunks::<2>();
+                out.extend(samples.iter().map(|&b| f32::from(u16::from_le_bytes(b))));
+            }),
+            SampleType::U32 => self.for_each_chunk(range, |bytes| {
+                let (samples, _) = bytes.as_chunks::<4>();
+                out.extend(samples.iter().map(|&b| u32::from_le_bytes(b) as f32));
+            }),
+            SampleType::F32 => self.for_each_chunk(range, |bytes| {
+                let (samples, _) = bytes.as_chunks::<4>();
+                out.extend(samples.iter().map(|&b| f32::from_le_bytes(b)));
+            }),
+        }
+    }
+
+    fn check_range(&self, range: &Range<u64>) -> Result<(), ReadError> {
+        if range.start > range.end || range.end > self.spec_count {
+            return Err(ReadError::OutOfRange {
+                range: range.clone(),
+                available: self.spec_count,
+            });
+        }
+        Ok(())
+    }
+
     fn read_samples<T: Sample>(&self, range: Range<u64>) -> Result<Vec<T>, ReadError> {
         debug_assert_eq!(T::SAMPLE_TYPE, self.header.sample_type);
-        let h = &self.header;
-        let spec_bytes = h.spec_bytes();
-        let specs_per_block = h.db_spec_count();
-        let block_len = u64::from(h.db_header_size) + u64::from(h.db_size);
-        let spec_samples = h.frq_bands as usize;
-
-        let total_specs = (range.end - range.start) as usize;
-        let mut out = Vec::with_capacity(total_specs * spec_samples);
-        let mut buf = vec![0u8; (total_specs.min(specs_per_block as usize)) * spec_bytes as usize];
-
-        let mut spec = range.start;
-        while spec < range.end {
-            let block = spec / specs_per_block;
-            let in_block = spec % specs_per_block;
-            let count = (range.end - spec).min(specs_per_block - in_block);
-            let offset = u64::from(h.header_size)
-                + block * block_len
-                + u64::from(h.db_header_size)
-                + in_block * spec_bytes;
-            let bytes = &mut buf[..(count * spec_bytes) as usize];
-            read_exact_at(&self.file, bytes, offset)?;
+        let samples = (range.end - range.start) as usize * self.header.frq_bands as usize;
+        let mut out = Vec::with_capacity(samples);
+        self.for_each_chunk(range, |bytes| {
             out.extend(
                 bytes
                     .chunks_exact(T::SAMPLE_TYPE.size())
                     .map(T::from_le_slice),
             );
-            spec += count;
-        }
+        })?;
         Ok(out)
+    }
+
+    /// Reads `range` block by block and passes the raw sample bytes of every block to `visit`,
+    /// in order. Uses a reused per-thread buffer.
+    fn for_each_chunk(
+        &self,
+        range: Range<u64>,
+        mut visit: impl FnMut(&[u8]),
+    ) -> Result<(), ReadError> {
+        thread_local! {
+            static BUFFER: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
+        }
+        let h = &self.header;
+        let spec_bytes = h.spec_bytes();
+        let specs_per_block = h.db_spec_count();
+        let block_len = u64::from(h.db_header_size) + u64::from(h.db_size);
+
+        BUFFER.with_borrow_mut(|buf| {
+            let mut spec = range.start;
+            while spec < range.end {
+                let block = spec / specs_per_block;
+                let in_block = spec % specs_per_block;
+                let count = (range.end - spec).min(specs_per_block - in_block);
+                let offset = u64::from(h.header_size)
+                    + block * block_len
+                    + u64::from(h.db_header_size)
+                    + in_block * spec_bytes;
+                let len = (count * spec_bytes) as usize;
+                if buf.len() < len {
+                    buf.resize(len, 0);
+                }
+                read_exact_at(&self.file, &mut buf[..len], offset)?;
+                visit(&buf[..len]);
+                spec += count;
+            }
+            Ok(())
+        })
     }
 }
 
@@ -300,6 +348,19 @@ mod tests {
         let file = write_file(Datamode::Fft, 2, 2, false, 4, &u16_bytes(0..5));
         let stream = StreamFile::open(file.path()).unwrap();
         assert_eq!(stream.spec_count(), 2);
+    }
+
+    #[test]
+    fn read_f32_matches_read() {
+        let file = write_file(Datamode::Fft, 3, 2, false, 4, &u16_bytes(0..30));
+        let stream = StreamFile::open(file.path()).unwrap();
+        let mut out = vec![-1.0];
+        stream.read_f32(2..9, &mut out).unwrap();
+        let expected: Vec<f32> = std::iter::once(-1.0)
+            .chain((6..27).map(|v| v as f32))
+            .collect();
+        assert_eq!(out, expected);
+        assert!(stream.read_f32(9..11, &mut out).is_err());
     }
 
     #[test]
