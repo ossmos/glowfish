@@ -1,21 +1,26 @@
 # Command line reference
 
 ```text
-glowfish [OPTIONS] [PATH]                       open PATH in the viewer
+glowfish [OPTIONS] [PATH]                       open a file or folder in the viewer
 glowfish export <FILE> -o <PNG> [OPTIONS]       render FILE to a PNG
 glowfish config [--default | --init]            show, print or create the configuration
 ```
 
 `glowfish --help` and `glowfish <command> --help` list the options as well.
 
-## Opening a file
+## Opening a file or folder
 
 ```sh
 glowfish [OPTIONS] [PATH]
 ```
 
-`PATH` is a measurement file. Without it, a file dialog opens. Folders cannot be opened yet;
-that comes with the metadata selection.
+`PATH` is a measurement file or a folder; see [Opening a folder](folders.md). Without it, a file
+dialog opens.
+
+| Option | | Configuration key |
+| --- | --- | --- |
+| `--recursive` | include files in subfolders of a folder (default) | `metadata.recursive` |
+| `--no-recursive` | only files directly in the folder | `metadata.recursive` |
 
 ## View options
 

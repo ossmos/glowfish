@@ -5,4 +5,6 @@ mod scan;
 mod store;
 pub use error::StoreError;
 pub use filter::{COLUMNS, MetadataFilter};
-pub use store::{MetadataStore, SqliteStore};
+pub use metadata::StreamFileMetadata;
+pub use scan::scan_dir;
+pub use store::{MetadataStore, SqliteStore, SyncStats};

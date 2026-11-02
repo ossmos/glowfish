@@ -1,0 +1,13 @@
+[package]
+name = "glowfish-app"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+analyzer-files = { version = "0.1.0", path = "../analyzer-files" }
+bevy = "0.20.1"
+chrono = "0.4.45"
+glowfish-data = { version = "0.1.0", path = "../glowfish-data" }
+stream-metadata-cache = { version = "0.1.0", path = "../stream-metadata-cache" }
+tokio = { version = "1.54.1", features = ["rt"] }
+visualization = { version = "0.1.0", path = "../visualization" }

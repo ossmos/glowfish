@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use bevy::ui::{ComputedNode, UiGlobalTransform};
 use glowfish_data::{Grid, MinMaxCell, ValueRange};
 
-use crate::camera::{BlocksViewInput, ZOOM_STEP, cursor_over_ui};
+use crate::camera::{BlocksViewInput, ZOOM_STEP, cursor_over_ui, view_size};
 use crate::colormap::PLACEHOLDER;
 use crate::spectrogram::value_range;
 use crate::{
@@ -31,7 +31,7 @@ impl Plugin for SignalPlugin {
         app.add_systems(
             Update,
             (
-                spawn_signal.run_if(resource_changed::<Dataset>),
+                spawn_signal.run_if(resource_exists::<crate::Rebuild>),
                 signal_input.before(crate::DataSystems),
                 update_signal.after(crate::DataSystems),
             )
@@ -93,7 +93,7 @@ fn update_signal(
     config: Res<VisualizationConfig>,
     selection: Option<Res<Selection>>,
     displayed: Option<Res<DisplayedGrid>>,
-    cameras: Query<&Camera, With<Camera2d>>,
+    cameras: Query<&Camera, (With<Camera2d>, With<VisualizationEntity>)>,
     ui_scale: Res<UiScale>,
     views: Query<&Mesh2d, With<SignalView>>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -203,8 +203,13 @@ fn signal_input(
     let Some(mut selection) = selection else {
         return;
     };
-    let rect = plot_rect(window.size(), Layout::Interactive, ui_scale.0);
+    let rect = plot_rect(
+        view_size(&window, &config, ui_scale.0),
+        Layout::Interactive,
+        ui_scale.0,
+    );
     let cursor = window.cursor_position();
+    let inset = config.view_left_px(ui_scale.0);
     let over_ui = cursor.is_some_and(|c| cursor_over_ui(c, &window, &nodes));
     if buttons.just_pressed(config.controls.pan) {
         *dragging = !over_ui;
@@ -227,7 +232,8 @@ fn signal_input(
             MouseScrollUnit::Pixel => scroll.delta.y / 40.0,
         };
         // cursor x in plot space: logical pixels from the left window edge
-        let at = ((cursor.x - PLOT_MARGIN[0] * ui_scale.0) / rect.width()).clamp(0.0, 1.0) as f64;
+        let at = ((cursor.x - inset - PLOT_MARGIN[0] * ui_scale.0) / rect.width()).clamp(0.0, 1.0)
+            as f64;
         moved = moved.zoomed(at, ZOOM_STEP.powf(lines as f64), dataset.rows());
     }
     if moved != *selection {

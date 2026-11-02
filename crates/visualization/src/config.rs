@@ -83,6 +83,16 @@ pub struct VisualizationConfig {
     pub axes: bool,
     /// Every text shown to users.
     pub labels: Labels,
+    /// Width of a panel left of the view in UI pixels (scaled by `UiScale`); the view, HUD and
+    /// timeline start right of it. The panel's owner provides a full-window UI camera.
+    pub view_left: f32,
+}
+
+impl VisualizationConfig {
+    /// The left inset in logical window pixels.
+    pub fn view_left_px(&self, ui_scale: f32) -> f32 {
+        self.view_left * ui_scale
+    }
 }
 
 impl Default for VisualizationConfig {
@@ -97,6 +107,7 @@ impl Default for VisualizationConfig {
             layout: Layout::default(),
             axes: false,
             labels: Labels::default(),
+            view_left: 0.0,
         }
     }
 }

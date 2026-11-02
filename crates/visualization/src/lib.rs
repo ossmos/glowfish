@@ -68,7 +68,8 @@ impl Plugin for VisualizationPlugin {
             .add_systems(
                 First,
                 despawn_previous.run_if(resource_exists_and_changed::<Dataset>),
-            );
+            )
+            .add_systems(Last, end_rebuild.run_if(resource_exists::<Rebuild>));
     }
 }
 
@@ -87,6 +88,20 @@ fn load_custom_font(config: Res<VisualizationConfig>, fonts: Option<ResMut<Asset
     }
 }
 
+/// Present for one frame after the dataset changed: the entities of the previous dataset are
+/// gone and the systems that spawn the scene run.
+///
+/// Spawning is tied to this marker rather than to the dataset's change detection, so a dataset
+/// inserted in the middle of a frame (e.g. by a file selection) is not spawned and then
+/// despawned again at the start of the next frame.
+#[derive(Resource)]
+pub(crate) struct Rebuild;
+
 fn despawn_previous(mut commands: Commands) {
     commands.despawn_all::<With<VisualizationEntity>>();
+    commands.insert_resource(Rebuild);
+}
+
+fn end_rebuild(mut commands: Commands) {
+    commands.remove_resource::<Rebuild>();
 }

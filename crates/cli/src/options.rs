@@ -136,10 +136,7 @@ fn set<T>(target: &mut T, value: Option<T>) {
 /// Opens a measurement file.
 pub fn open_dataset(path: &Path, config: &Config) -> anyhow::Result<Dataset> {
     if path.is_dir() {
-        bail!(
-            "{} is a folder; opening folders needs the metadata selection app, which is not available yet",
-            path.display()
-        );
+        bail!("{} is a folder; open a measurement file", path.display());
     }
     let pool = LoadPool::new(config.loading.threads);
     Dataset::open(path, config.loading.cache_mb << 20, pool)

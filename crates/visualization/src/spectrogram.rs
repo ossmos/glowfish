@@ -93,7 +93,7 @@ impl Plugin for SpectrogramPlugin {
             .add_systems(
                 Update,
                 (
-                    spawn_spectrogram.run_if(resource_changed::<Dataset>),
+                    spawn_spectrogram.run_if(resource_exists::<crate::Rebuild>),
                     update_mesh,
                     update_data,
                     update_transform,

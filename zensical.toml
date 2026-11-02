@@ -6,6 +6,7 @@ nav = [
   { "Installation" = "installation.md" },
   { "Usage" = [
     { "The viewer" = "usage/viewer.md" },
+    { "Opening a folder" = "usage/folders.md" },
     { "Exporting images" = "usage/export.md" },
     { "Command line reference" = "usage/command-line.md" },
   ] },

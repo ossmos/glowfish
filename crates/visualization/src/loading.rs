@@ -21,7 +21,7 @@ impl Plugin for DataPlugin {
             .add_systems(
                 Update,
                 (
-                    reset_on_new_dataset.run_if(resource_changed::<Dataset>),
+                    reset_on_new_dataset.run_if(resource_exists_and_changed::<Dataset>),
                     request_load,
                     poll_load,
                 )

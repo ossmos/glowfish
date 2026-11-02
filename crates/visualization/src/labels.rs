@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -38,6 +39,26 @@ pub struct Labels {
     /// Title of the file dialog.
     pub open_file: String,
 
+    /// Folder panel: section titles.
+    pub project: String,
+    pub measurement: String,
+    pub channels: String,
+    /// Title of the file list: `{channel}`.
+    pub files: String,
+    /// Second line of a file in the list: `{time}` and `{frequency}` compression factors,
+    /// `{bands}` frequency bands.
+    pub file_details: String,
+    /// Second line of a time signal in the list: `{time}` compression factor.
+    pub signal_details: String,
+    /// While a folder is read: `{folder}`.
+    pub scanning: String,
+    /// When a folder has no measurement files: `{folder}`.
+    pub no_files: String,
+    /// Names of the data types in the file list, by code (e.g. `RAW`, `MAXIMUM`,
+    /// `MOV_AVERAGE_FRQ`); data types without an entry keep their English name.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub datatypes: BTreeMap<String, String>,
+
     /// Font file (TrueType / OpenType) for all texts, for scripts the bundled Fira Mono does not
     /// cover (it covers Latin, Greek and Cyrillic). `None` uses Fira Mono.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -62,6 +83,15 @@ impl Default for Labels {
             readout_not_loaded: "not loaded".into(),
             timeline: "start {start}    end {end}    span {span}    of {length}".into(),
             open_file: "Open a measurement file".into(),
+            project: "Project".into(),
+            measurement: "Measurement".into(),
+            channels: "Channels".into(),
+            files: "Files on channel {channel}".into(),
+            file_details: "t \u{d7}{time} \u{b7} f \u{d7}{frequency} \u{b7} {bands} bands".into(),
+            signal_details: "signal \u{b7} t \u{d7}{time}".into(),
+            scanning: "Reading {folder} ...".into(),
+            no_files: "No measurement files in {folder}".into(),
+            datatypes: BTreeMap::new(),
             font: None,
         }
     }

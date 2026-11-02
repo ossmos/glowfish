@@ -40,6 +40,9 @@ impl Plugin for AxesPlugin {
     }
 }
 
+/// The camera of a signal plot.
+type PlotCamera = (With<Camera2d>, With<VisualizationEntity>);
+
 /// A container placed at a label's anchor point; its text is aligned to that point.
 #[derive(Component)]
 struct AxisLabel;
@@ -128,7 +131,7 @@ fn update_axes(
     displayed: Option<Res<DisplayedGrid>>,
     ui_scale: Res<UiScale>,
     rigs: Query<(&Camera, &ViewRig)>,
-    cameras_2d: Query<(&Camera, &GlobalTransform), With<Camera2d>>,
+    cameras_2d: Query<(&Camera, &GlobalTransform), PlotCamera>,
     labels: Query<Entity, With<AxisLabel>>,
     mut previous: Local<Vec<Label>>,
 ) {
@@ -164,6 +167,17 @@ fn update_axes(
         },
         _ => Vec::new(),
     };
+    // labels of ticks outside of the view would cover the UI around it
+    let view = rigs
+        .iter()
+        .next()
+        .map(|(camera, _)| camera)
+        .or_else(|| cameras_2d.iter().next().map(|(camera, _)| camera))
+        .and_then(Camera::logical_viewport_rect);
+    let wanted: Vec<Label> = match view {
+        Some(view) => wanted.into_iter().filter(|l| view.contains(l.at)).collect(),
+        None => wanted,
+    };
     // labels only change when the view moves; rebuild them only then
     if *previous == wanted {
         return;
@@ -184,6 +198,7 @@ fn spawn_label(commands: &mut Commands, label: &Label, ui_scale: f32) {
         Anchor::Left => (JustifyContent::FlexEnd, AlignItems::Center),
         Anchor::Above => (JustifyContent::FlexStart, AlignItems::FlexEnd),
     };
+    // world_to_viewport gives window coordinates: a viewport offset is already included
     let at = label.at / ui_scale;
     commands.spawn((
         AxisLabel,

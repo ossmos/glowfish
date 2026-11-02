@@ -76,7 +76,7 @@ impl Plugin for TimelinePlugin {
         app.init_resource::<TimelineDrag>().add_systems(
             Update,
             (
-                spawn_timeline.run_if(resource_changed::<Dataset>),
+                spawn_timeline.run_if(resource_exists::<crate::Rebuild>),
                 timeline_input.before(crate::DataSystems),
                 (update_overview, update_window, update_progress).after(crate::DataSystems),
             )
@@ -114,7 +114,7 @@ fn spawn_timeline(
         BlocksViewInput,
         Node {
             position_type: PositionType::Absolute,
-            left: px(0),
+            left: px(config.view_left),
             right: px(0),
             bottom: px(0),
             height: px(TIMELINE_HEIGHT),

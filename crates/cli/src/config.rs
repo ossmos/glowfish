@@ -55,6 +55,16 @@ readout_not_loaded = "not loaded"
 timeline = "start {start}    end {end}    span {span}    of {length}"
 # Title of the file dialog
 open_file = "Open a measurement file"
+# Folder panel: section titles, the title of the file list, the second line of a file
+# ({time} and {frequency} compression, {bands} frequency bands), and status messages
+project = "Project"
+measurement = "Measurement"
+channels = "Channels"
+files = "Files on channel {channel}"
+file_details = "t ×{time} · f ×{frequency} · {bands} bands"
+signal_details = "signal · t ×{time}"
+scanning = "Reading {folder} ..."
+no_files = "No measurement files in {folder}"
 # Font for all texts. The bundled Fira Mono covers Latin, Greek and Cyrillic; set a font file
 # (TrueType / OpenType) for other scripts, e.g. "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc"
 # font = ""
@@ -87,6 +97,8 @@ height = 1080
 [metadata]
 # Database of the metadata cache used when opening folders: a file path, or ":memory:"
 database = ":memory:"
+# Include files in subfolders when opening a folder
+recursive = true
 "#;
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -231,12 +243,14 @@ impl Default for ExportConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct MetadataConfig {
     pub database: String,
+    pub recursive: bool,
 }
 
 impl Default for MetadataConfig {
     fn default() -> Self {
         Self {
             database: ":memory:".into(),
+            recursive: true,
         }
     }
 }
@@ -356,6 +370,21 @@ mod tests {
     }
 
     #[test]
+    fn default_file_lists_every_setting() {
+        let defaults = toml::to_string(&Config::default()).unwrap();
+        for line in defaults.lines() {
+            if let Some((key, _)) = line.split_once(" = ") {
+                assert!(
+                    DEFAULT_CONFIG
+                        .lines()
+                        .any(|l| l.starts_with(&format!("{key} = "))),
+                    "`{key}` is missing in DEFAULT_CONFIG"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn partial_files_keep_defaults() {
         let config = Config::parse("[view]\nmode = \"cubes\"\n").unwrap();
         assert_eq!(config.view.mode, Mode::Cubes);
@@ -377,6 +406,8 @@ mod tests {
             Config::parse("[labels]\nsurfaces = \"x\"\n").is_err(),
             "unknown label"
         );
+        let config = Config::parse("[labels.datatypes]\nRAW = \"Rohdaten\"\n").unwrap();
+        assert_eq!(config.labels.datatypes["RAW"], "Rohdaten");
     }
 
     #[test]

@@ -2299,6 +2299,7 @@ dependencies = [
  "bevy",
  "clap",
  "directories",
+ "glowfish-app",
  "glowfish-data",
  "rfd",
  "serde",
@@ -3276,6 +3277,19 @@ dependencies = [
  "slotmap",
  "wasm-bindgen",
  "web-sys",
+]
+
+[[package]]
+name = "glowfish-app"
+version = "0.1.0"
+dependencies = [
+ "analyzer-files",
+ "bevy",
+ "chrono",
+ "glowfish-data",
+ "stream-metadata-cache",
+ "tokio",
+ "visualization",
 ]
 
 [[package]]
@@ -5940,6 +5954,7 @@ dependencies = [
  "chrono",
  "rayon",
  "sqlx",
+ "tempfile",
  "thiserror 2.0.21",
  "tokio",
  "walkdir",

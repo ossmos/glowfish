@@ -6,7 +6,7 @@ use bevy::render::view::screenshot::{Screenshot, save_to_disk};
 use bevy::ui_widgets::{Activate, Button, observe};
 use glowfish_data::{Grid, MinMaxCell};
 
-use crate::camera::{BlocksViewInput, ViewRig, ground_point};
+use crate::camera::{BlocksViewInput, ViewRig, ground_point, view_cursor, view_size};
 use crate::colormap::{rgba8, viridis};
 use crate::layout::{FREQ_EXTENT, TIME_EXTENT};
 use crate::signal::{PLOT_MARGIN, plot_rect};
@@ -48,7 +48,7 @@ impl Plugin for HudPlugin {
         app.add_systems(
             Update,
             (
-                spawn_hud.run_if(resource_changed::<Dataset>),
+                spawn_hud.run_if(resource_exists::<crate::Rebuild>),
                 (style_buttons, update_legend, update_readout, update_title)
                     .after(crate::DataSystems),
             )
@@ -120,7 +120,7 @@ fn spawn_hud(
             VisualizationEntity,
             Node {
                 position_type: PositionType::Absolute,
-                left: px(14),
+                left: px(config.view_left + 14.0),
                 top: px(12),
                 ..default()
             },
@@ -131,7 +131,7 @@ fn spawn_hud(
             VisualizationEntity,
             Node {
                 position_type: PositionType::Absolute,
-                left: px(10),
+                left: px(config.view_left + 10.0),
                 top: px(10),
                 column_gap: px(4),
                 ..default()
@@ -218,7 +218,7 @@ fn spawn_hud(
             VisualizationEntity,
             Node {
                 position_type: PositionType::Absolute,
-                left: px(10),
+                left: px(config.view_left + 10.0),
                 bottom: px(bottom + 8.0),
                 flex_direction: FlexDirection::Column,
                 row_gap: px(4),
@@ -367,12 +367,13 @@ fn update_readout(
     let (Some(selection), Some(displayed)) = (selection, displayed) else {
         return;
     };
-    let cursor = window.cursor_position();
+    let cursor = view_cursor(&window, &config, ui_scale.0);
     // (row, band) under the cursor
     let target = cursor.and_then(|cursor| match dataset.kind {
         DataKind::Spectrogram => {
             let (camera, transform) = cameras.single().ok()?;
-            let point = ground_point(camera, transform, cursor)?;
+            let absolute = cursor + Vec2::new(config.view_left_px(ui_scale.0), 0.0);
+            let point = ground_point(camera, transform, absolute)?;
             let inside =
                 (0.0..=TIME_EXTENT).contains(&point.x) && (0.0..=FREQ_EXTENT).contains(&point.z);
             inside.then(|| {
@@ -382,7 +383,11 @@ fn update_readout(
             })
         }
         DataKind::Signal => {
-            let rect = plot_rect(window.size(), Layout::Interactive, ui_scale.0);
+            let rect = plot_rect(
+                view_size(&window, &config, ui_scale.0),
+                Layout::Interactive,
+                ui_scale.0,
+            );
             let x = (cursor.x - PLOT_MARGIN[0] * ui_scale.0) / rect.width();
             (0.0..=1.0)
                 .contains(&x)

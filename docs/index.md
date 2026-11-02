@@ -15,7 +15,12 @@ Open a file in the viewer:
 glowfish p000665c0b01.000
 ```
 
-Without a file, glowfish opens a file dialog.
+Without a file, glowfish opens a file dialog. Open a whole folder to choose between its
+measurements, channels and files:
+
+```sh
+glowfish measurements/
+```
 
 Export a PNG without opening a window, here the time window from 298.4 s to 298.7 s as cubes:
 
@@ -43,5 +48,6 @@ Time signals
 
 - [Installation](installation.md): build glowfish and what it needs to run
 - [The viewer](usage/viewer.md): controls, the timeline and how data is loaded
+- [Opening a folder](usage/folders.md): choosing measurements, channels and files
 - [Exporting images](usage/export.md): PNG files for reports
 - [Configuration](configuration.md): all settings of the configuration file

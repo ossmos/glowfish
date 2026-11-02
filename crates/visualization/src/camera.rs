@@ -1,4 +1,4 @@
-use bevy::camera::RenderTarget;
+use bevy::camera::{RenderTarget, Viewport};
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll, MouseScrollUnit};
 use bevy::prelude::*;
 use bevy::ui::{ComputedNode, IsDefaultUiCamera, UiGlobalTransform};
@@ -14,6 +14,10 @@ const MAX_PITCH: f32 = 1.5;
 const MIN_DISTANCE: f32 = 3.0;
 const MAX_DISTANCE: f32 = 80.0;
 const ROTATE_SPEED: f32 = 0.006;
+/// Vertical field of view for views of at least `WIDE_ASPECT`; narrower views get a larger one,
+/// so the data keeps fitting horizontally.
+const FOV: f32 = std::f32::consts::FRAC_PI_4;
+const WIDE_ASPECT: f32 = 16.0 / 9.0;
 /// Factor of the time window per wheel line when zooming in time.
 pub const ZOOM_STEP: f64 = 0.85;
 
@@ -59,7 +63,8 @@ impl Plugin for ViewCameraPlugin {
         app.init_resource::<ViewDrag>().add_systems(
             Update,
             (
-                spawn_camera.run_if(resource_changed::<Dataset>),
+                spawn_camera.run_if(resource_exists::<crate::Rebuild>),
+                fit_viewport,
                 (track_drag, view_input, apply_rig).chain(),
             )
                 .chain()
@@ -104,6 +109,78 @@ fn spawn_camera(
             IsDefaultUiCamera,
         ));
     }
+}
+
+/// The vertical field of view that shows at least as much horizontally as [`FOV`] does at
+/// [`WIDE_ASPECT`].
+pub fn fitting_fov(aspect: f32) -> f32 {
+    if aspect >= WIDE_ASPECT || aspect <= 0.0 {
+        return FOV;
+    }
+    2.0 * ((FOV / 2.0).tan() * WIDE_ASPECT / aspect).atan()
+}
+
+/// Keeps window cameras right of a left panel (`VisualizationConfig::view_left`) and widens the
+/// field of view of narrow views.
+fn fit_viewport(
+    config: Res<VisualizationConfig>,
+    ui_scale: Res<UiScale>,
+    window: Single<&Window>,
+    mut cameras: Query<
+        (&mut Camera, &RenderTarget, Option<&mut Projection>),
+        With<VisualizationEntity>,
+    >,
+) {
+    let scale = window.scale_factor();
+    let size = window.physical_size();
+    let left = (config.view_left_px(ui_scale.0) * scale) as u32;
+    let viewport = (left > 0 && left < size.x).then(|| Viewport {
+        physical_position: UVec2::new(left, 0),
+        physical_size: UVec2::new(size.x - left, size.y.max(1)),
+        ..default()
+    });
+    for (mut camera, target, projection) in &mut cameras {
+        if let (Some(mut projection), Some(size)) = (projection, camera.logical_viewport_size())
+            && let Projection::Perspective(perspective) = &mut *projection
+        {
+            let fov = fitting_fov(size.x / size.y.max(1.0));
+            if (perspective.fov - fov).abs() > 1e-4 {
+                perspective.fov = fov;
+            }
+        }
+        let same = match (&camera.viewport, &viewport) {
+            (None, None) => true,
+            (Some(a), Some(b)) => {
+                a.physical_position == b.physical_position && a.physical_size == b.physical_size
+            }
+            _ => false,
+        };
+        if matches!(target, RenderTarget::Window(_)) && !same {
+            camera.viewport = viewport.clone();
+        }
+    }
+}
+
+/// Logical size of the view: the window without a left panel.
+pub fn view_size(window: &Window, config: &VisualizationConfig, ui_scale: f32) -> Vec2 {
+    (window.size() - Vec2::new(config.view_left_px(ui_scale), 0.0)).max(Vec2::ONE)
+}
+
+/// The cursor relative to the view, i.e. right of a left panel.
+pub fn view_cursor(window: &Window, config: &VisualizationConfig, ui_scale: f32) -> Option<Vec2> {
+    let inset = config.view_left_px(ui_scale);
+    cursor_in_view(window, config, ui_scale).map(|cursor| cursor - Vec2::new(inset, 0.0))
+}
+
+/// The cursor in window coordinates if it is over the view, as camera conversions like
+/// `viewport_to_world` expect it.
+pub fn cursor_in_view(
+    window: &Window,
+    config: &VisualizationConfig,
+    ui_scale: f32,
+) -> Option<Vec2> {
+    let cursor = window.cursor_position()?;
+    (cursor.x >= config.view_left_px(ui_scale)).then_some(cursor)
 }
 
 /// True if `cursor` (logical pixels) is over a node that blocks view input.
@@ -151,6 +228,7 @@ fn view_input(
     config: Res<VisualizationConfig>,
     dataset: Res<Dataset>,
     keys: Res<ButtonInput<KeyCode>>,
+    ui_scale: Res<UiScale>,
     motion: Res<AccumulatedMouseMotion>,
     scroll: Res<AccumulatedMouseScroll>,
     window: Single<&Window>,
@@ -184,7 +262,7 @@ fn view_input(
         if lines != 0.0 && !over_ui {
             if zoom_time {
                 // keep the time under the cursor in place; the view centre if it is off the data
-                let at = cursor
+                let at = cursor_in_view(&window, &config, ui_scale.0)
                     .and_then(|c| ground_point(camera, camera_transform, c))
                     .map_or(0.5, |p| (p.x / TIME_EXTENT) as f64);
                 moved = moved.zoomed(at, ZOOM_STEP.powf(lines as f64), dataset.rows());
@@ -252,6 +330,19 @@ mod tests {
         let to_focus = (rig.focus - t.translation).normalize();
         assert!(t.forward().dot(to_focus) > 0.999);
         assert!((t.translation.distance(rig.focus) - 10.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn narrow_views_get_a_wider_field_of_view() {
+        assert_eq!(fitting_fov(2.0), FOV);
+        assert_eq!(fitting_fov(WIDE_ASPECT), FOV);
+        let narrow = fitting_fov(WIDE_ASPECT / 2.0);
+        assert!(narrow > FOV);
+        // the horizontal extent stays the same
+        let horizontal = |fov: f32, aspect: f32| (fov / 2.0).tan() * aspect;
+        assert!(
+            (horizontal(narrow, WIDE_ASPECT / 2.0) - horizontal(FOV, WIDE_ASPECT)).abs() < 1e-5
+        );
     }
 
     #[test]

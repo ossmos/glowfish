@@ -2,11 +2,12 @@
 use async_trait::async_trait;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 use sqlx::{QueryBuilder, Sqlite};
-use std::path::PathBuf;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::error::StoreError;
-use crate::filter::MetadataFilter;
+use crate::filter::{COLUMNS, MetadataFilter};
 use crate::metadata::StreamFileMetadata;
 use crate::scan::scan_dir;
 
@@ -17,8 +18,10 @@ pub struct SqliteStore {
 impl SqliteStore {
     pub async fn connect(url: &str) -> Result<Self, StoreError> {
         let opts = SqliteConnectOptions::from_str(url)?.create_if_missing(true);
+        // every connection to an in-memory database opens its own, empty database
+        let connections = if url.contains(":memory:") { 1 } else { 5 };
         let pool = SqlitePoolOptions::new()
-            .max_connections(5)
+            .max_connections(connections)
             .connect_with(opts)
             .await?;
         Ok(Self { pool })
@@ -47,20 +50,45 @@ pub trait MetadataStore: Send + Sync {
     //) -> Result<Vec<StreamFileMetadata>, StoreError>;
     async fn find(&self, filter: MetadataFilter) -> Result<Vec<StreamFileMetadata>, StoreError>;
     async fn insert_many(&self, files: &[StreamFileMetadata]) -> Result<(), StoreError>;
-    async fn synchronize_directory(&self, path: PathBuf) -> Result<SyncStats, StoreError> {
-        let scanned = tokio::task::spawn_blocking(move || scan_dir(&path, false))
+    /// Deletes the rows of these files.
+    async fn delete_many(&self, filepaths: &[String]) -> Result<(), StoreError>;
+
+    /// Scans `root` (and its subfolders if `recursive`), stores the metadata of every stream
+    /// file and removes the rows of files under `root` that no longer exist. Returns the
+    /// metadata of all stream files found.
+    async fn synchronize_directory(
+        &self,
+        root: PathBuf,
+        recursive: bool,
+    ) -> Result<(Vec<StreamFileMetadata>, SyncStats), StoreError> {
+        let scan_root = root.clone();
+        let scanned = tokio::task::spawn_blocking(move || scan_dir(&scan_root, recursive, false))
             .await
             .map_err(StoreError::Join)??;
 
+        let prefix = root.to_string_lossy().into_owned();
+        let known = self
+            .find(MetadataFilter::new().and(COLUMNS.filepath.like(&format!("{prefix}%"))))
+            .await?;
+        let found: HashSet<&str> = scanned.iter().map(|f| f.filepath.as_str()).collect();
+        let removed: Vec<String> = known
+            .iter()
+            // LIKE treats `_` and `%` in the prefix as wildcards: compare real paths
+            .filter(|f| Path::new(&f.filepath).starts_with(&root))
+            .filter(|f| recursive || Path::new(&f.filepath).parent() == Some(root.as_path()))
+            .filter(|f| !found.contains(f.filepath.as_str()))
+            .map(|f| f.filepath.clone())
+            .collect();
+        self.delete_many(&removed).await?;
         self.insert_many(&scanned).await?;
-        //let removed = self.delete_missing(&root, &paths).await?;
 
-        Ok(SyncStats {
+        let stats = SyncStats {
             inserted: scanned.len() as u32,
             updated: 0,
-            removed: 0,
+            removed: removed.len() as u32,
             skipped: 0,
-        })
+        };
+        Ok((scanned, stats))
     }
 }
 
@@ -78,7 +106,7 @@ impl MetadataStore for SqliteStore {
             // Maybe QueryBuilder is more performant here
             let _rec = sqlx::query(
                 r#"
-                INSERT INTO buffer_metadata
+                INSERT OR REPLACE INTO buffer_metadata
                 (
                     filepath,
                     header_size,
@@ -145,6 +173,18 @@ impl MetadataStore for SqliteStore {
             .bind(f.spec_count as i64)
             .execute(&mut *tx)
             .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn delete_many(&self, filepaths: &[String]) -> Result<(), StoreError> {
+        let mut tx = self.pool.begin().await?;
+        for path in filepaths {
+            sqlx::query("DELETE FROM buffer_metadata WHERE filepath = ?")
+                .bind(path)
+                .execute(&mut *tx)
+                .await?;
         }
         tx.commit().await?;
         Ok(())
@@ -303,5 +343,79 @@ mod tests {
                 .expect("Fetching filtered metadata failed");
             assert_eq!(results.len(), expected_results);
         }
+    }
+}
+
+#[cfg(test)]
+mod sync_tests {
+    use super::*;
+
+    const HEADER: &[u8] = include_bytes!("../../analyzer-files/testdata/compressed-header.bin");
+
+    /// `root/a.000`, `root/b.000`, `root/sub/c.000` and a file that is no stream file.
+    fn folder() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("sub")).unwrap();
+        for name in ["a.000", "b.000", "sub/c.000"] {
+            std::fs::write(dir.path().join(name), HEADER).unwrap();
+        }
+        std::fs::write(dir.path().join("notes.txt"), "not a stream file").unwrap();
+        dir
+    }
+
+    async fn store() -> SqliteStore {
+        let store = SqliteStore::connect("sqlite::memory:").await.unwrap();
+        store.migrate().await.unwrap();
+        store
+    }
+
+    fn names(files: &[StreamFileMetadata]) -> Vec<String> {
+        let mut names: Vec<String> = files
+            .iter()
+            .map(|f| {
+                Path::new(&f.filepath)
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect();
+        names.sort();
+        names
+    }
+
+    #[tokio::test]
+    async fn recursive_and_flat_scans() {
+        let dir = folder();
+        let store = store().await;
+        let (files, _) = store
+            .synchronize_directory(dir.path().to_owned(), true)
+            .await
+            .unwrap();
+        assert_eq!(names(&files), ["a.000", "b.000", "c.000"]);
+        let (files, _) = store
+            .synchronize_directory(dir.path().to_owned(), false)
+            .await
+            .unwrap();
+        assert_eq!(names(&files), ["a.000", "b.000"]);
+    }
+
+    #[tokio::test]
+    async fn synchronizing_again_updates_and_removes() {
+        let dir = folder();
+        let store = store().await;
+        store
+            .synchronize_directory(dir.path().to_owned(), true)
+            .await
+            .unwrap();
+        std::fs::remove_file(dir.path().join("b.000")).unwrap();
+        // a second sync must not fail on the rows that already exist
+        let (_, stats) = store
+            .synchronize_directory(dir.path().to_owned(), true)
+            .await
+            .unwrap();
+        assert_eq!(stats.removed, 1);
+        let all = store.find(MetadataFilter::new()).await.unwrap();
+        assert_eq!(names(&all), ["a.000", "c.000"]);
     }
 }

@@ -79,6 +79,16 @@ readout_not_loaded = "not loaded"
 timeline = "start {start}    end {end}    span {span}    of {length}"
 # Title of the file dialog
 open_file = "Open a measurement file"
+# Folder panel: section titles, the title of the file list, the second line of a file
+# ({time} and {frequency} compression, {bands} frequency bands), and status messages
+project = "Project"
+measurement = "Measurement"
+channels = "Channels"
+files = "Files on channel {channel}"
+file_details = "t ×{time} · f ×{frequency} · {bands} bands"
+signal_details = "signal · t ×{time}"
+scanning = "Reading {folder} ..."
+no_files = "No measurement files in {folder}"
 # Font for all texts. The bundled Fira Mono covers Latin, Greek and Cyrillic; set a font file
 # (TrueType / OpenType) for other scripts, e.g. "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc"
 # font = ""
@@ -111,6 +121,8 @@ height = 1080
 [metadata]
 # Database of the metadata cache used when opening folders: a file path, or ":memory:"
 database = ":memory:"
+# Include files in subfolders when opening a folder
+recursive = true
 ```
 
 ## view
@@ -150,7 +162,34 @@ order. A text set to `""` is not shown. Numbers and units (ms, Hz, kHz) are not 
 | `readout_not_loaded` | `"not loaded"` | | readout where no data is loaded yet |
 | `timeline` | `"start {start}    end {end}    span {span}    of {length}"` | `{start}`, `{end}`, `{span}`, `{length}` | below the [timeline](usage/viewer.md#the-timeline) |
 | `open_file` | `"Open a measurement file"` | | title of the file dialog |
+| `project`, `measurement`, `channels` | `"Project"`, ... | | section titles of the [folder panel](usage/folders.md) |
+| `files` | `"Files on channel {channel}"` | `{channel}` | title of the file list |
+| `file_details` | `"t ×{time} · f ×{frequency} · {bands} bands"` | `{time}`, `{frequency}`: compression; `{bands}` | second line of a file in the list |
+| `signal_details` | `"signal · t ×{time}"` | `{time}` | second line of a time signal in the list |
+| `scanning` | `"Reading {folder} ..."` | `{folder}` | while a folder is read |
+| `no_files` | `"No measurement files in {folder}"` | `{folder}` | for a folder without measurement files |
 | `font` | not set | | font file for all texts, see below |
+
+### Data types
+
+The file list names the data type of each file, e.g. *Raw* or *Maximum*. Rename them in a
+`[labels.datatypes]` table, by the code of the data type:
+
+```toml
+[labels.datatypes]
+RAW = "Rohdaten"
+MAXIMUM = "Maximum"
+AVERAGE = "Mittelwert"
+MOV_AVERAGE_FRQ = "Gleitender Mittelwert (Zeit und Frequenz)"
+```
+
+The codes are those of the Analyzer4D software without their `COMP_` prefix: `RAW`,
+`DOWNSAMPLE`, `MAXIMUM`, `AVERAGE`, `STD_DEVIATION`, `ENVELOPE`, `MOV_AVERAGE`, `EXTERN_DATA`,
+`ANALYZE_OVERVIEW`, `MOV_AVERAGE_OPT`, `COLLECTION`, `IMPORT_SIG`, `SCOPE_RAW`,
+`MOV_AVERAGE_FRQ`, `SLOPECHANGE`, `OTHER`, `IO_SIGNAL`, `ENERGY`, `AUDIO_RAW`, `XY_PLOT`,
+`SECOND_FFT`, `AUDIO_COMMENT`, `CP_ENERGY_SIG`, `VID_MEASURE`, `VID_SCREEN`, `VID_EXT_LINK`,
+`ENVELOPE_UPPER`, `ENVELOPE_LOWER`, `PATTERN_REFOBJ`, `SIGNIFICANCE`, `SIGNIFICANCE_32`,
+`PATTERN_MASK`, `GRADIENT_FRQ`, `CSV_EXPORT`.
 
 ### Fonts
 
@@ -249,11 +288,15 @@ back to places you looked at before.
 
 ## metadata
 
+Settings for [opening folders](usage/folders.md).
+
 | Key | Default | |
 | --- | --- | --- |
-| `database` | `":memory:"` | where the metadata of opened folders is cached: a file path, or `":memory:"` to keep it in memory only |
+| `database` | `":memory:"` | where the metadata of the files is kept: `":memory:"` while glowfish runs, or a file path to keep it between runs |
+| `recursive` | `true` | include files in subfolders; `--recursive` / `--no-recursive` override it |
 
-This setting is reserved for opening folders, which is not available yet.
+With a database file, opening the same folder again updates the stored metadata: new files
+are added and files that are gone are removed.
 
 ## Older hardware
 

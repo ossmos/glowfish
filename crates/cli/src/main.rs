@@ -22,8 +22,15 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
 
-    /// Measurement file to open
+    /// Measurement file or folder to open
     path: Option<PathBuf>,
+
+    /// Include files in subfolders when opening a folder (default)
+    #[arg(long, overrides_with = "no_recursive")]
+    recursive: bool,
+    /// Only files directly in the folder
+    #[arg(long, overrides_with = "recursive")]
+    no_recursive: bool,
 
     #[command(flatten)]
     options: ViewOptions,
@@ -69,7 +76,14 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
-        None => viewer::run(cli.path, &cli.options),
+        None => {
+            let recursive = match (cli.recursive, cli.no_recursive) {
+                (true, _) => Some(true),
+                (_, true) => Some(false),
+                _ => None,
+            };
+            viewer::run(cli.path, recursive, &cli.options)
+        }
         Some(Command::Export {
             file,
             output,
@@ -130,6 +144,13 @@ mod tests {
         // the later flag wins
         let cli = Cli::try_parse_from(["glowfish", "f", "--axes", "--no-axes"]).unwrap();
         assert!(cli.options.no_axes && !cli.options.axes);
+        let cli = Cli::try_parse_from(["glowfish", "folder", "--no-recursive"]).unwrap();
+        assert!(cli.no_recursive && !cli.recursive);
+        // folder options belong to the viewer, not to export
+        assert!(
+            Cli::try_parse_from(["glowfish", "export", "f", "-o", "a.png", "--no-recursive"])
+                .is_err()
+        );
 
         let cli = Cli::try_parse_from([
             "glowfish", "export", "f", "-o", "a.png", "--size", "800x600", "--start", "10",
