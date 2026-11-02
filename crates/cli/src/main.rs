@@ -125,6 +125,11 @@ mod tests {
             .unwrap();
         assert_eq!(cli.path, Some(PathBuf::from("file.000")));
         assert_eq!(cli.options.yaw, Some(-45.0));
+        assert!(!cli.options.axes);
+
+        // the later flag wins
+        let cli = Cli::try_parse_from(["glowfish", "f", "--axes", "--no-axes"]).unwrap();
+        assert!(cli.options.no_axes && !cli.options.axes);
 
         let cli = Cli::try_parse_from([
             "glowfish", "export", "f", "-o", "a.png", "--size", "800x600", "--start", "10",

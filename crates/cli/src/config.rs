@@ -22,6 +22,9 @@ cells = "max"
 # Most cells (cubes or surface vertices) drawn; lower it for older hardware.
 # 65536 gives 512 (time) x 128 (frequency) cells.
 max_cells = 65536
+# Axes with ticks and labels: time and frequency for spectrograms, time and amplitude for
+# signals
+axes = false
 # Initial camera: rotation around the vertical axis and elevation in degrees, distance
 yaw = -30.0
 pitch = 35.0
@@ -74,6 +77,7 @@ pub struct ViewConfig {
     pub mode: Mode,
     pub cells: Cells,
     pub max_cells: usize,
+    pub axes: bool,
     /// Degrees.
     pub yaw: f32,
     /// Degrees.
@@ -88,6 +92,7 @@ impl Default for ViewConfig {
             mode: Mode::Surface,
             cells: Cells::Max,
             max_cells: VisualizationConfig::default().max_cells,
+            axes: VisualizationConfig::default().axes,
             yaw: perspective.yaw.to_degrees().round(),
             pitch: perspective.pitch.to_degrees().round(),
             distance: perspective.distance,
@@ -281,6 +286,7 @@ impl Config {
                 Cells::Range => CellValue::Range,
             },
             scaling: self.scaling()?,
+            axes: v.axes,
             controls: Controls {
                 pan: self.controls.pan.into(),
                 rotate: self.controls.rotate.into(),

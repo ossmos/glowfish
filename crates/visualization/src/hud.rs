@@ -224,9 +224,14 @@ fn spawn_hud(
                 row_gap: px(4),
                 ..default()
             },
-            children![colored_text(axes, 13.0, Color::srgb(0.65, 0.65, 0.65))],
         ))
         .id();
+    // the hint is redundant next to real axes
+    if !config.axes {
+        commands
+            .entity(labels)
+            .with_child(colored_text(axes, 13.0, Color::srgb(0.65, 0.65, 0.65)));
+    }
     if interactive {
         commands
             .entity(labels)

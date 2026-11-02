@@ -2,6 +2,7 @@
 //! time window. Add [`VisualizationPlugin`] and insert a [`Dataset`] resource to show data;
 //! replacing the resource shows another dataset.
 
+mod axes;
 mod camera;
 mod colormap;
 mod config;
@@ -44,6 +45,7 @@ impl Plugin for VisualizationPlugin {
             .init_resource::<VisualizationConfig>()
             .add_plugins((
                 DataPlugin,
+                axes::AxesPlugin,
                 camera::ViewCameraPlugin,
                 spectrogram::SpectrogramPlugin,
                 signal::SignalPlugin,

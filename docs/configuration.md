@@ -27,7 +27,7 @@ error: invalid configuration /home/me/.config/glowfish/config.toml: TOML parse e
   |
 2 | mod = "cubes"
   | ^^^
-unknown field `mod`, expected one of `mode`, `cells`, `max_cells`, `yaw`, `pitch`, `distance`
+unknown field `mod`, expected one of `mode`, `cells`, `max_cells`, `axes`, `yaw`, `pitch`, `distance`
 ```
 
 ## Defaults
@@ -46,6 +46,9 @@ cells = "max"
 # Most cells (cubes or surface vertices) drawn; lower it for older hardware.
 # 65536 gives 512 (time) x 128 (frequency) cells.
 max_cells = 65536
+# Axes with ticks and labels: time and frequency for spectrograms, time and amplitude for
+# signals
+axes = false
 # Initial camera: rotation around the vertical axis and elevation in degrees, distance
 yaw = -30.0
 pitch = 35.0
@@ -88,6 +91,7 @@ database = ":memory:"
 | `mode` | `"surface"` | `"surface"` or `"cubes"`, see [Surface and cubes](usage/viewer.md#surface-and-cubes) |
 | `cells` | `"max"` | `"max"`: columns from the ground up to the maximum of each cell. `"range"`: boxes from the minimum to the maximum, which also shows gaps |
 | `max_cells` | `65536` | most cells drawn, see [below](#older-hardware) |
+| `axes` | `false` | axes with ticks and labels, see [Axes](usage/viewer.md#axes) |
 | `yaw` | `-30.0` | initial rotation around the vertical axis in degrees; 0 looks along the frequency axis |
 | `pitch` | `35.0` | initial elevation in degrees, from about 3 (flat) to 86 (from above) |
 | `distance` | `22.0` | initial camera distance, from 3 to 80; the data is 16 units long |

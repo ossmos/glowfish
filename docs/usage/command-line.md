@@ -28,6 +28,7 @@ These options work for the viewer and for `export`. They override the
 | `--mode <MODE>` | `surface`, `cubes` | `view.mode` |
 | `--cells <CELLS>` | `max`, `range` | `view.cells` |
 | `--max-cells <N>` | most cells drawn | `view.max_cells` |
+| `--axes`, `--no-axes` | show or hide the axes; the last one given wins | `view.axes` |
 | `--scaling <MODE>` | `linear`, `auto`, `fixed` | `scaling.mode` |
 | `--min <VALUE>` | lower value of fixed scaling | `scaling.min` |
 | `--max <VALUE>` | upper value of fixed scaling | `scaling.max` |

@@ -24,6 +24,13 @@ pub struct ViewOptions {
     #[arg(long, value_name = "N")]
     pub max_cells: Option<usize>,
 
+    /// Show axes with ticks and labels
+    #[arg(long, overrides_with = "no_axes")]
+    pub axes: bool,
+    /// Hide the axes
+    #[arg(long, overrides_with = "axes")]
+    pub no_axes: bool,
+
     /// How values are scaled
     #[arg(long, value_enum)]
     pub scaling: Option<ScalingMode>,
@@ -73,6 +80,14 @@ impl ViewOptions {
         set(&mut v.mode, self.mode);
         set(&mut v.cells, self.cells);
         set(&mut v.max_cells, self.max_cells);
+        set(
+            &mut v.axes,
+            match (self.axes, self.no_axes) {
+                (true, _) => Some(true),
+                (_, true) => Some(false),
+                _ => None,
+            },
+        );
         set(&mut v.yaw, self.yaw);
         set(&mut v.pitch, self.pitch);
         set(&mut v.distance, self.distance);
@@ -134,6 +149,23 @@ pub fn open_dataset(path: &Path, config: &Config) -> anyhow::Result<Dataset> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn axes_flags() {
+        let mut config = Config::parse("[view]\naxes = true\n").unwrap();
+        let options = ViewOptions {
+            no_axes: true,
+            ..Default::default()
+        };
+        options.apply(&mut config);
+        assert!(!config.view.axes);
+        ViewOptions {
+            axes: true,
+            ..Default::default()
+        }
+        .apply(&mut config);
+        assert!(config.view.axes);
+    }
 
     #[test]
     fn options_override_the_file() {

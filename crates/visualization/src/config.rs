@@ -76,6 +76,9 @@ pub struct VisualizationConfig {
     pub controls: Controls,
     pub perspective: Perspective,
     pub layout: Layout,
+    /// Axes with ticks and labels: time and frequency for spectrograms, time and amplitude for
+    /// signals.
+    pub axes: bool,
 }
 
 impl Default for VisualizationConfig {
@@ -88,6 +91,7 @@ impl Default for VisualizationConfig {
             controls: Controls::default(),
             perspective: Perspective::default(),
             layout: Layout::default(),
+            axes: false,
         }
     }
 }

@@ -36,6 +36,11 @@ pub fn run(
     {
         bail!("the output file must end with .png");
     }
+    if let Some(dir) = output.parent().filter(|d| !d.as_os_str().is_empty())
+        && !dir.is_dir()
+    {
+        bail!("the folder {} does not exist", dir.display());
+    }
     let config = options.config()?;
     let (width, height) = size.unwrap_or((config.export.width, config.export.height));
     let dataset = open_dataset(file, &config)?;
@@ -78,11 +83,14 @@ pub fn run(
     })
     .add_systems(Startup, setup)
     .add_systems(Last, capture);
+    let started = std::time::SystemTime::now();
     match app.run() {
-        AppExit::Success => {
+        // saving only logs its errors; check that the file was written by this run
+        AppExit::Success if written_since(&output, started) => {
             println!("wrote {}", output.display());
             Ok(())
         }
+        AppExit::Success => bail!("could not write {}", output.display()),
         AppExit::Error(_) => bail!("export timed out after {TIMEOUT_SECS} s"),
     }
 }
@@ -156,6 +164,12 @@ fn capture(
                 exit.write(AppExit::Success);
             },
         );
+}
+
+fn written_since(path: &Path, since: std::time::SystemTime) -> bool {
+    std::fs::metadata(path)
+        .and_then(|m| m.modified())
+        .is_ok_and(|modified| modified >= since)
 }
 
 /// Parses `WIDTHxHEIGHT`.

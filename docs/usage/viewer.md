@@ -91,6 +91,21 @@ When you move or zoom, the data that is already loaded is shown immediately; the
 in the background and a yellow bar on top of the timeline shows the progress. A new move
 cancels loading that is no longer needed.
 
+## Axes
+
+With `--axes` (or `view.axes = true` in the [configuration](../configuration.md#view)), the
+view gets axes with ticks and labels:
+
+- spectrograms: **time** in ms along the front edge and **frequency** along the left edge of
+  the data, on the ground,
+- signals: **time** in ms below and **amplitude** left of the plot.
+
+![Axes on a spectrogram](../images/axes.png)
+
+The ticks follow the displayed time window, so they update while you pan and zoom. The labels
+are always drawn upright and facing you, whatever the angle of the view. `--no-axes` hides the
+axes when they are switched on in the configuration.
+
 ## Colours and scaling
 
 The colour and the height both show the amplitude. The legend on the right shows which values
