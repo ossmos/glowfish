@@ -41,6 +41,7 @@ type ScanResult = Result<Vec<StreamFileMetadata>, String>;
 #[derive(Resource)]
 pub struct Scan {
     pub root: PathBuf,
+    started: std::time::Instant,
     handle: Mutex<Option<JoinHandle<ScanResult>>>,
 }
 
@@ -71,6 +72,7 @@ impl Scan {
         });
         Self {
             root,
+            started: std::time::Instant::now(),
             handle: Mutex::new(Some(handle)),
         }
     }
@@ -105,9 +107,10 @@ pub(crate) fn poll_scan(
     match result {
         Ok(files) => {
             info!(
-                "found {} measurement files in {}",
+                "found {} measurement files in {} in {:.2?}",
                 files.len(),
-                scan.root.display()
+                scan.root.display(),
+                scan.started.elapsed()
             );
             commands.insert_resource(Catalog::new(&scan.root, &files));
         }

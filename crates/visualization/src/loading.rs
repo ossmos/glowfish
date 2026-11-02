@@ -9,6 +9,10 @@ use crate::{DataKind, Dataset, Selection, VisualizationConfig};
 
 /// Most cells along the time axis of a signal plot; about one per pixel.
 const MAX_SIGNAL_CELLS: usize = 4096;
+/// Most cells along the time axis of a spectrogram. The data texture is one cell wider and
+/// must stay within the texture size limit of every GPU (4096 is safe); more cells than
+/// screen pixels would not show more anyway. Files with few bands hit this limit first.
+const MAX_SPECTROGRAM_CELLS: usize = 4095;
 
 /// Keeps the displayed grid in sync with the [`Selection`]: loads in the background, shows the
 /// cached part of the data immediately and cancels loads that are no longer needed.
@@ -50,6 +54,8 @@ pub struct Loading {
     task: Option<Task<Result<Grid<MinMaxCell>, DataError>>>,
     control: LoadControl,
     request: Option<Request>,
+    /// When the running load started.
+    started: Option<std::time::Instant>,
 }
 
 impl Loading {
@@ -78,7 +84,7 @@ pub fn grid_size(kind: DataKind, max_cells: usize, bands: usize) -> (usize, usiz
         DataKind::Signal => (max_cells.clamp(1, MAX_SIGNAL_CELLS), 1),
         DataKind::Spectrogram => {
             let freq = ((max_cells as f64 / 4.0).sqrt() as usize).clamp(1, bands.max(1));
-            ((max_cells / freq).max(1), freq)
+            ((max_cells / freq).clamp(1, MAX_SPECTROGRAM_CELLS), freq)
         }
     }
 }
@@ -134,14 +140,22 @@ fn request_load(
             pyramid.query_with(range, time_cells, freq_cells, &task_control)
         }));
         loading.control = control;
+        loading.started = Some(std::time::Instant::now());
     }
     loading.request = Some(request);
 }
 
+/// How often the view shows what is loaded so far while a load runs.
+const PROGRESS_INTERVAL: f32 = 0.25;
+
 fn poll_load(
     mut commands: Commands,
+    time: Res<Time>,
+    dataset: Res<Dataset>,
     mut loading: ResMut<Loading>,
+    displayed: Option<Res<DisplayedGrid>>,
     mut redraw: MessageWriter<RequestRedraw>,
+    mut since_progress: Local<f32>,
 ) {
     let Some(task) = loading.task.as_mut() else {
         return;
@@ -149,14 +163,44 @@ fn poll_load(
     let Some(result) = block_on(poll_once(task)) else {
         // reactive rendering only wakes on input; keep updating until the data is there
         redraw.write(RequestRedraw);
+        // show what is loaded so far, e.g. for large files on slow disks
+        *since_progress += time.delta_secs();
+        if *since_progress >= PROGRESS_INTERVAL
+            && let Some(request) = &loading.request
+        {
+            *since_progress = 0.0;
+            let peeked = dataset.pyramid.peek(
+                request.range.clone(),
+                request.time_cells,
+                request.freq_cells,
+            );
+            let loaded =
+                |grid: &Grid<MinMaxCell>| grid.cells.iter().filter(|c| !c.is_empty()).count();
+            if displayed.is_none_or(|d| loaded(&peeked) > loaded(&d.grid)) {
+                commands.insert_resource(DisplayedGrid {
+                    grid: peeked,
+                    complete: false,
+                });
+            }
+        }
         return;
     };
     loading.task = None;
+    *since_progress = 0.0;
+    let elapsed = loading.started.take().map(|s| s.elapsed());
     match result {
-        Ok(grid) => commands.insert_resource(DisplayedGrid {
-            grid,
-            complete: true,
-        }),
+        Ok(grid) => {
+            if let Some(elapsed) = elapsed {
+                debug!(
+                    "loaded rows {:?} of {} in {elapsed:.2?}",
+                    grid.range, dataset.name
+                );
+            }
+            commands.insert_resource(DisplayedGrid {
+                grid,
+                complete: true,
+            })
+        }
         Err(DataError::Cancelled) => {}
         Err(error) => {
             error!("loading data failed: {error}");
@@ -234,10 +278,61 @@ pub(crate) mod tests {
         panic!("loading did not complete");
     }
 
+    /// A ramp that takes 10 ms per read.
+    struct SlowRamp(Ramp);
+
+    impl Source for SlowRamp {
+        fn rows(&self) -> u64 {
+            self.0.rows()
+        }
+
+        fn bands(&self) -> usize {
+            self.0.bands()
+        }
+
+        fn read(&self, range: Range<u64>, out: &mut Vec<f32>) -> Result<(), DataError> {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            self.0.read(range, out)
+        }
+    }
+
+    #[test]
+    fn shows_partial_data_while_loading() {
+        let mut slow = dataset(DataKind::Spectrogram, 1, 1);
+        slow.pyramid = Arc::new(Pyramid::new(
+            Box::new(SlowRamp(Ramp {
+                rows: 300_000,
+                bands: 4,
+            })),
+            64 << 20,
+            LoadPool::new(2),
+        ));
+        let mut app = app(slow);
+        let mut partial = false;
+        for _ in 0..2000 {
+            app.update();
+            if let Some(displayed) = app.world().get_resource::<DisplayedGrid>() {
+                let loaded = displayed.grid.cells.iter().any(|c| !c.is_empty());
+                if !displayed.complete && loaded {
+                    partial = true;
+                    break;
+                }
+                if displayed.complete {
+                    break;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(partial, "no partial data was shown while loading");
+    }
+
     #[test]
     fn grid_sizes() {
         assert_eq!(grid_size(DataKind::Spectrogram, 65536, 512), (512, 128));
-        assert_eq!(grid_size(DataKind::Spectrogram, 65536, 16), (4096, 16));
+        assert_eq!(grid_size(DataKind::Spectrogram, 65536, 16), (4095, 16));
+        // few bands would make the data texture wider than GPUs allow
+        assert_eq!(grid_size(DataKind::Spectrogram, 65536, 2), (4095, 2));
+        assert_eq!(grid_size(DataKind::Spectrogram, 65536, 1), (4095, 1));
         assert_eq!(grid_size(DataKind::Signal, 65536, 1), (MAX_SIGNAL_CELLS, 1));
         assert_eq!(grid_size(DataKind::Spectrogram, 0, 16), (1, 1));
     }

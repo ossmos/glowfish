@@ -161,10 +161,12 @@ impl<S: Source, D: Downsampler> Pyramid<S, D> {
 
     /// Like [`query`](Self::query) but only uses cached data and never reads from the source.
     /// Cells without cached data are [`Downsampler::EMPTY`].
+    ///
+    /// Runs on the calling thread, so it never waits for a load that occupies the pool: it is
+    /// meant to be called from a UI thread while loading.
     pub fn peek(&self, range: Range<u64>, time_cells: usize, freq_cells: usize) -> Grid<D::Cell> {
         let range = self.clamp(range);
-        self.pool
-            .install(|| self.grid(range, time_cells, freq_cells, None))
+        self.grid(range, time_cells, freq_cells, None)
             .expect("peeking does not read from the source")
     }
 
@@ -201,10 +203,17 @@ impl<S: Source, D: Downsampler> Pyramid<S, D> {
 
         let first_tile = cells_range.start / TILE_CELLS;
         let last_tile = (cells_range.end - 1) / TILE_CELLS;
-        let tiles: Vec<(u64, Option<TileRef<D::Cell>>)> = (first_tile..=last_tile)
-            .into_par_iter()
-            .map(|index| Ok((index, self.tile(level, index, range.clone(), load)?)))
-            .collect::<Result<_, DataError>>()?;
+        let tile = |index| Ok((index, self.tile(level, index, range.clone(), load)?));
+        let tiles: Vec<(u64, Option<TileRef<D::Cell>>)> = match load {
+            // loading runs on the pool; peeking must not touch it (see `peek`)
+            Some(_) => (first_tile..=last_tile)
+                .into_par_iter()
+                .map(tile)
+                .collect::<Result<_, DataError>>()?,
+            None => (first_tile..=last_tile)
+                .map(tile)
+                .collect::<Result<_, DataError>>()?,
+        };
 
         for (index, tile) in tiles {
             let Some(tile) = tile else { continue };
@@ -814,6 +823,54 @@ mod tests {
             Err(DataError::Cancelled)
         ));
         assert!(pyramid.source().take_reads().is_empty());
+    }
+
+    /// A source that takes `delay` per read, like a slow disk.
+    struct SlowSource {
+        inner: VecSource,
+        delay: std::time::Duration,
+    }
+
+    impl Source for SlowSource {
+        fn rows(&self) -> u64 {
+            self.inner.rows()
+        }
+
+        fn bands(&self) -> usize {
+            self.inner.bands()
+        }
+
+        fn read(&self, range: Range<u64>, out: &mut Vec<f32>) -> Result<(), DataError> {
+            std::thread::sleep(self.delay);
+            self.inner.read(range, out)
+        }
+    }
+
+    #[test]
+    fn peeking_does_not_wait_for_a_running_load() {
+        let source = SlowSource {
+            inner: VecSource::new(400_000, 4, value),
+            delay: std::time::Duration::from_millis(20),
+        };
+        let pyramid = Arc::new(Pyramid::<_>::new(source, usize::MAX, LoadPool::new(2)));
+        let control = LoadControl::new();
+        let loading = {
+            let (pyramid, control) = (pyramid.clone(), control.clone());
+            // about 400 reads of 20 ms on 2 threads: several seconds
+            std::thread::spawn(move || pyramid.query_with(0..400_000, 100, 4, &control))
+        };
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let started = std::time::Instant::now();
+        pyramid.peek(0..400_000, 100, 4);
+        let waited = started.elapsed();
+
+        control.cancel();
+        assert!(matches!(loading.join().unwrap(), Err(DataError::Cancelled)));
+        assert!(
+            waited < std::time::Duration::from_millis(50),
+            "peek waited {waited:?} for the load"
+        );
     }
 
     #[test]
