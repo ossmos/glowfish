@@ -327,15 +327,22 @@ fn update_legend(
     dataset: Res<Dataset>,
     config: Res<VisualizationConfig>,
     displayed: Option<Res<DisplayedGrid>>,
-    mut labels: Query<(&LegendLabel, &mut Text)>,
+    mut labels: Query<(&LegendLabel, &mut Text, &mut Visibility)>,
 ) {
     let Some(displayed) = displayed else { return };
     if !displayed.is_changed() && !config.is_changed() {
         return;
     }
+    // a signal's amplitude axis shows the same range; spectrograms keep them for the colours
+    let visible = !(config.axes && dataset.kind == DataKind::Signal);
     let range = value_range(config.scaling, dataset.full_scale, &displayed.grid);
-    for (label, mut text) in &mut labels {
+    for (label, mut text, mut visibility) in &mut labels {
         text.0 = format::amplitude(if label.top { range.max } else { range.min });
+        visibility.set_if_neq(if visible {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        });
     }
 }
 

@@ -8,7 +8,9 @@ use bevy::input::mouse::MouseButton;
 use clap::ValueEnum;
 use glowfish_data::Scaling;
 use serde::{Deserialize, Serialize};
-use visualization::{CellValue, Controls, DisplayMode, Perspective, VisualizationConfig};
+use visualization::{
+    AxisLabels, CellValue, Controls, DisplayMode, Perspective, VisualizationConfig,
+};
 
 /// The default configuration with comments, written by `glowfish config --init`.
 pub const DEFAULT_CONFIG: &str = r#"# glowfish configuration. Command line options override these values.
@@ -29,6 +31,13 @@ axes = false
 yaw = -30.0
 pitch = 35.0
 distance = 22.0
+
+[labels]
+# Titles of the axes (view.axes), e.g. for translations; an empty title is not shown.
+# {unit} in the frequency title becomes Hz or kHz.
+time = "time [ms]"
+frequency = "frequency [{unit}]"
+amplitude = "amplitude"
 
 [scaling]
 # "linear": 0 to the full scale of the file
@@ -64,6 +73,7 @@ database = ":memory:"
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub view: ViewConfig,
+    pub labels: LabelsConfig,
     pub scaling: ScalingConfig,
     pub controls: ControlsConfig,
     pub loading: LoadingConfig,
@@ -96,6 +106,25 @@ impl Default for ViewConfig {
             yaw: perspective.yaw.to_degrees().round(),
             pitch: perspective.pitch.to_degrees().round(),
             distance: perspective.distance,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct LabelsConfig {
+    pub time: String,
+    pub frequency: String,
+    pub amplitude: String,
+}
+
+impl Default for LabelsConfig {
+    fn default() -> Self {
+        let labels = AxisLabels::default();
+        Self {
+            time: labels.time,
+            frequency: labels.frequency,
+            amplitude: labels.amplitude,
         }
     }
 }
@@ -287,6 +316,11 @@ impl Config {
             },
             scaling: self.scaling()?,
             axes: v.axes,
+            axis_labels: AxisLabels {
+                time: self.labels.time.clone(),
+                frequency: self.labels.frequency.clone(),
+                amplitude: self.labels.amplitude.clone(),
+            },
             controls: Controls {
                 pan: self.controls.pan.into(),
                 rotate: self.controls.rotate.into(),
@@ -325,6 +359,17 @@ mod tests {
         assert_eq!(config.view.mode, Mode::Cubes);
         assert_eq!(config.view.max_cells, ViewConfig::default().max_cells);
         assert_eq!(config.loading, LoadingConfig::default());
+    }
+
+    #[test]
+    fn translated_labels() {
+        let config =
+            Config::parse("[labels]\ntime = \"Zeit [ms]\"\nfrequency = \"Frequenz [{unit}]\"\n")
+                .unwrap();
+        let labels = config.visualization().unwrap().axis_labels;
+        assert_eq!(labels.time, "Zeit [ms]");
+        assert_eq!(labels.frequency_in("kHz"), "Frequenz [kHz]");
+        assert_eq!(labels.amplitude, "amplitude");
     }
 
     #[test]

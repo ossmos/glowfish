@@ -54,6 +54,13 @@ yaw = -30.0
 pitch = 35.0
 distance = 22.0
 
+[labels]
+# Titles of the axes (view.axes), e.g. for translations; an empty title is not shown.
+# {unit} in the frequency title becomes Hz or kHz.
+time = "time [ms]"
+frequency = "frequency [{unit}]"
+amplitude = "amplitude"
+
 [scaling]
 # "linear": 0 to the full scale of the file
 # "auto": minimum to maximum of the displayed data
@@ -97,6 +104,24 @@ database = ":memory:"
 | `distance` | `22.0` | initial camera distance, from 3 to 80; the data is 16 units long |
 
 Time signals use `max_cells` too: up to 4096 points along time.
+
+## labels
+
+Titles of the [axes](usage/viewer.md#axes), for example to translate them. A title set to
+`""` is not shown.
+
+| Key | Default | |
+| --- | --- | --- |
+| `time` | `"time [ms]"` | title of the time axis; times are always in milliseconds |
+| `frequency` | `"frequency [{unit}]"` | title of the frequency axis; `{unit}` becomes `Hz` or `kHz`, the unit of the ticks |
+| `amplitude` | `"amplitude"` | title of the amplitude axis of signals |
+
+```toml
+[labels]
+time = "Zeit [ms]"
+frequency = "Frequenz [{unit}]"
+amplitude = "Amplitude"
+```
 
 ## scaling
 

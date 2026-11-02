@@ -11,7 +11,8 @@ use crate::layout::{FREQ_EXTENT, TIME_EXTENT};
 use crate::signal::plot_rect;
 use crate::spectrogram::value_range;
 use crate::{
-    DataKind, Dataset, DisplayedGrid, Selection, VisualizationConfig, VisualizationEntity, format,
+    AxisLabels, DataKind, Dataset, DisplayedGrid, Selection, VisualizationConfig,
+    VisualizationEntity, format,
 };
 
 const COLOR: Color = Color::srgb(0.75, 0.75, 0.78);
@@ -137,7 +138,14 @@ fn update_axes(
                 .iter()
                 .next()
                 .map(|(camera, rig)| {
-                    spectrogram_axes(&mut gizmos, &dataset, &selection, camera, rig)
+                    spectrogram_axes(
+                        &mut gizmos,
+                        &dataset,
+                        &selection,
+                        &config.axis_labels,
+                        camera,
+                        rig,
+                    )
                 })
                 .unwrap_or_default(),
             DataKind::Signal => match (cameras_2d.iter().next(), displayed) {
@@ -209,6 +217,7 @@ fn spectrogram_axes(
     gizmos: &mut Gizmos,
     dataset: &Dataset,
     selection: &Selection,
+    titles: &AxisLabels,
     camera: &Camera,
     rig: &ViewRig,
 ) -> Vec<Label> {
@@ -216,7 +225,9 @@ fn spectrogram_axes(
     let project = |p: Vec3| camera.world_to_viewport(&transform, p).ok();
     let mut labels = Vec::new();
     let mut push = |at: Option<Vec2>, text: String, anchor| {
-        if let Some(at) = at {
+        if let Some(at) = at
+            && !text.is_empty()
+        {
             labels.push(Label { at, text, anchor });
         }
     };
@@ -244,7 +255,7 @@ fn spectrogram_axes(
     }
     push(
         project(Vec3::new(TIME_EXTENT / 2.0, 0.0, z + TICK * 5.0)),
-        "time [ms]".into(),
+        titles.time.clone(),
         Anchor::Below,
     );
 
@@ -272,7 +283,7 @@ fn spectrogram_axes(
     }
     push(
         project(Vec3::new(x, 0.0, -TICK)),
-        format!("frequency [{unit}]"),
+        titles.frequency_in(unit),
         Anchor::Above,
     );
     labels
@@ -298,7 +309,9 @@ fn signal_axes(
     let project = |p: Vec2| camera.world_to_viewport(transform, p.extend(0.0)).ok();
     let mut labels = Vec::new();
     let mut push = |at: Option<Vec2>, text: String, anchor| {
-        if let Some(at) = at {
+        if let Some(at) = at
+            && !text.is_empty()
+        {
             labels.push(Label { at, text, anchor });
         }
     };
@@ -325,7 +338,7 @@ fn signal_axes(
     }
     push(
         project(Vec2::new(rect.max.x, rect.min.y - tick - gap)),
-        "time [ms]".into(),
+        config.axis_labels.time.clone(),
         Anchor::Left,
     );
 
@@ -348,7 +361,7 @@ fn signal_axes(
     }
     push(
         project(Vec2::new(rect.min.x, rect.max.y + gap)),
-        "amplitude".into(),
+        config.axis_labels.amplitude.clone(),
         Anchor::Above,
     );
     labels

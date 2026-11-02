@@ -19,7 +19,9 @@ use bevy::prelude::*;
 use bevy::winit::WinitSettings;
 
 pub use camera::{BlocksViewInput, ViewRig};
-pub use config::{CellValue, Controls, DisplayMode, Layout, Perspective, VisualizationConfig};
+pub use config::{
+    AxisLabels, CellValue, Controls, DisplayMode, Layout, Perspective, VisualizationConfig,
+};
 pub use dataset::{DataKind, Dataset, Selection};
 pub use loading::{DataPlugin, DataSystems, DisplayedGrid, Loading, grid_size};
 pub use spectrogram::SpectrogramMaterial;
