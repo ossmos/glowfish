@@ -9,7 +9,7 @@ use crate::colormap::{rgba8, viridis};
 use crate::spectrogram::value_range;
 use crate::{
     Dataset, DisplayedGrid, Layout, Loading, Selection, VisualizationConfig, VisualizationEntity,
-    format,
+    fill, format,
 };
 
 /// Height of the timeline panel in logical pixels.
@@ -273,12 +273,13 @@ fn grid_to_width(grid: &Grid<MinMaxCell>, width: usize) -> Grid<MinMaxCell> {
 
 fn update_window(
     dataset: Res<Dataset>,
+    config: Res<VisualizationConfig>,
     selection: Option<Res<Selection>>,
     mut windows: Query<&mut Node, With<TimelineWindow>>,
     mut labels: Query<&mut Text, With<TimelineLabel>>,
 ) {
     let Some(selection) = selection else { return };
-    if !selection.is_changed() {
+    if !selection.is_changed() && !config.is_changed() {
         return;
     }
     let rows = dataset.rows().max(1) as f64;
@@ -291,12 +292,14 @@ fn update_window(
         dataset.row_time_ms(selection.end),
     );
     for mut text in &mut labels {
-        text.0 = format!(
-            "start {}    end {}    span {}    of {}",
-            format::milliseconds(start),
-            format::milliseconds(end),
-            format::milliseconds(end - start),
-            format::milliseconds(dataset.row_time_ms(rows)),
+        text.0 = fill(
+            &config.labels.timeline,
+            &[
+                ("start", &format::milliseconds(start)),
+                ("end", &format::milliseconds(end)),
+                ("span", &format::milliseconds(end - start)),
+                ("length", &format::milliseconds(dataset.row_time_ms(rows))),
+            ],
         );
     }
 }

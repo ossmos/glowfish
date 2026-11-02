@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 use glowfish_data::Scaling;
 
+use crate::Labels;
+
 /// How spectrograms are drawn.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DisplayMode {
@@ -66,32 +68,6 @@ impl Default for Perspective {
     }
 }
 
-/// Titles of the axes, e.g. for translations. An empty title is not shown.
-#[derive(Debug, Clone, PartialEq)]
-pub struct AxisLabels {
-    pub time: String,
-    /// `{unit}` is replaced by the unit of the frequency ticks (Hz or kHz).
-    pub frequency: String,
-    pub amplitude: String,
-}
-
-impl Default for AxisLabels {
-    fn default() -> Self {
-        Self {
-            time: "time [ms]".into(),
-            frequency: "frequency [{unit}]".into(),
-            amplitude: "amplitude".into(),
-        }
-    }
-}
-
-impl AxisLabels {
-    /// The frequency title for ticks in `unit`.
-    pub fn frequency_in(&self, unit: &str) -> String {
-        self.frequency.replace("{unit}", unit)
-    }
-}
-
 #[derive(Resource, Debug, Clone, PartialEq)]
 pub struct VisualizationConfig {
     /// Maximum number of cells (cubes / surface vertices) drawn for a spectrogram.
@@ -105,7 +81,8 @@ pub struct VisualizationConfig {
     /// Axes with ticks and labels: time and frequency for spectrograms, time and amplitude for
     /// signals.
     pub axes: bool,
-    pub axis_labels: AxisLabels,
+    /// Every text shown to users.
+    pub labels: Labels,
 }
 
 impl Default for VisualizationConfig {
@@ -119,23 +96,7 @@ impl Default for VisualizationConfig {
             perspective: Perspective::default(),
             layout: Layout::default(),
             axes: false,
-            axis_labels: AxisLabels::default(),
+            labels: Labels::default(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn frequency_title_gets_the_unit() {
-        let labels = AxisLabels::default();
-        assert_eq!(labels.frequency_in("kHz"), "frequency [kHz]");
-        let german = AxisLabels {
-            frequency: "Frequenz in {unit}".into(),
-            ..AxisLabels::default()
-        };
-        assert_eq!(german.frequency_in("Hz"), "Frequenz in Hz");
     }
 }

@@ -12,7 +12,7 @@ pub fn run(path: Option<PathBuf>, options: &ViewOptions) -> anyhow::Result<()> {
     let path = match path {
         Some(path) => path,
         None => match rfd::FileDialog::new()
-            .set_title("Open a measurement file")
+            .set_title(&config.labels.open_file)
             .pick_file()
         {
             Some(path) => path,

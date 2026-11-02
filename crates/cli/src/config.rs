@@ -8,9 +8,7 @@ use bevy::input::mouse::MouseButton;
 use clap::ValueEnum;
 use glowfish_data::Scaling;
 use serde::{Deserialize, Serialize};
-use visualization::{
-    AxisLabels, CellValue, Controls, DisplayMode, Perspective, VisualizationConfig,
-};
+use visualization::{CellValue, Controls, DisplayMode, Labels, Perspective, VisualizationConfig};
 
 /// The default configuration with comments, written by `glowfish config --init`.
 pub const DEFAULT_CONFIG: &str = r#"# glowfish configuration. Command line options override these values.
@@ -33,11 +31,33 @@ pitch = 35.0
 distance = 22.0
 
 [labels]
-# Titles of the axes (view.axes), e.g. for translations; an empty title is not shown.
-# {unit} in the frequency title becomes Hz or kHz.
+# Every text of the user interface, e.g. for translations. Values are filled into the
+# placeholders in braces; their order can change. Units (ms, Hz, kHz) stay as they are.
+
+# Axis titles (view.axes); an empty title is not shown. {unit} is Hz or kHz.
 time = "time [ms]"
 frequency = "frequency [{unit}]"
 amplitude = "amplitude"
+# Buttons: display mode and saving the window as PNG
+surface = "Surface"
+cubes = "Cubes"
+save_png = "PNG"
+# Shown instead of the axes
+hint_spectrogram = "time: right   frequency: depth   amplitude: up"
+hint_signal = "time: right   amplitude: up"
+# Readout under the cursor; {value} for one value, {max} and {min} for several
+readout_time = "t = {time}"
+readout_frequency = "f = {frequency}"
+readout_value = "amplitude {value}"
+readout_range = "max {max}   min {min}"
+readout_not_loaded = "not loaded"
+# Below the timeline
+timeline = "start {start}    end {end}    span {span}    of {length}"
+# Title of the file dialog
+open_file = "Open a measurement file"
+# Font for all texts. The bundled Fira Mono covers Latin, Greek and Cyrillic; set a font file
+# (TrueType / OpenType) for other scripts, e.g. "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc"
+# font = ""
 
 [scaling]
 # "linear": 0 to the full scale of the file
@@ -73,7 +93,7 @@ database = ":memory:"
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub view: ViewConfig,
-    pub labels: LabelsConfig,
+    pub labels: Labels,
     pub scaling: ScalingConfig,
     pub controls: ControlsConfig,
     pub loading: LoadingConfig,
@@ -106,25 +126,6 @@ impl Default for ViewConfig {
             yaw: perspective.yaw.to_degrees().round(),
             pitch: perspective.pitch.to_degrees().round(),
             distance: perspective.distance,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct LabelsConfig {
-    pub time: String,
-    pub frequency: String,
-    pub amplitude: String,
-}
-
-impl Default for LabelsConfig {
-    fn default() -> Self {
-        let labels = AxisLabels::default();
-        Self {
-            time: labels.time,
-            frequency: labels.frequency,
-            amplitude: labels.amplitude,
         }
     }
 }
@@ -284,6 +285,11 @@ impl Config {
         if self.controls.pan == self.controls.rotate {
             bail!("controls.pan and controls.rotate must use different buttons");
         }
+        if let Some(font) = &self.labels.font
+            && !font.is_file()
+        {
+            bail!("labels.font: {} is not a file", font.display());
+        }
         self.scaling()?;
         Ok(())
     }
@@ -316,11 +322,7 @@ impl Config {
             },
             scaling: self.scaling()?,
             axes: v.axes,
-            axis_labels: AxisLabels {
-                time: self.labels.time.clone(),
-                frequency: self.labels.frequency.clone(),
-                amplitude: self.labels.amplitude.clone(),
-            },
+            labels: self.labels.clone(),
             controls: Controls {
                 pan: self.controls.pan.into(),
                 rotate: self.controls.rotate.into(),
@@ -366,10 +368,15 @@ mod tests {
         let config =
             Config::parse("[labels]\ntime = \"Zeit [ms]\"\nfrequency = \"Frequenz [{unit}]\"\n")
                 .unwrap();
-        let labels = config.visualization().unwrap().axis_labels;
+        let labels = config.visualization().unwrap().labels;
         assert_eq!(labels.time, "Zeit [ms]");
         assert_eq!(labels.frequency_in("kHz"), "Frequenz [kHz]");
         assert_eq!(labels.amplitude, "amplitude");
+        assert_eq!(labels.cubes, Labels::default().cubes);
+        assert!(
+            Config::parse("[labels]\nsurfaces = \"x\"\n").is_err(),
+            "unknown label"
+        );
     }
 
     #[test]
@@ -386,6 +393,7 @@ mod tests {
         assert!(Config::parse("[scaling]\nmode = \"fixed\"\nmin = 2.0\nmax = 1.0\n").is_err());
         assert!(Config::parse("[controls]\npan = \"left\"\nrotate = \"left\"\n").is_err());
         assert!(Config::parse("[view]\nmax_cells = 0\n").is_err());
+        assert!(Config::parse("[labels]\nfont = \"/nonexistent.ttf\"\n").is_err());
     }
 
     #[test]

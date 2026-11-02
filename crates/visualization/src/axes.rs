@@ -11,8 +11,8 @@ use crate::layout::{FREQ_EXTENT, TIME_EXTENT};
 use crate::signal::plot_rect;
 use crate::spectrogram::value_range;
 use crate::{
-    AxisLabels, DataKind, Dataset, DisplayedGrid, Selection, VisualizationConfig,
-    VisualizationEntity, format,
+    DataKind, Dataset, DisplayedGrid, Labels, Selection, VisualizationConfig, VisualizationEntity,
+    format,
 };
 
 const COLOR: Color = Color::srgb(0.75, 0.75, 0.78);
@@ -142,7 +142,7 @@ fn update_axes(
                         &mut gizmos,
                         &dataset,
                         &selection,
-                        &config.axis_labels,
+                        &config.labels,
                         camera,
                         rig,
                     )
@@ -217,7 +217,7 @@ fn spectrogram_axes(
     gizmos: &mut Gizmos,
     dataset: &Dataset,
     selection: &Selection,
-    titles: &AxisLabels,
+    titles: &Labels,
     camera: &Camera,
     rig: &ViewRig,
 ) -> Vec<Label> {
@@ -338,7 +338,7 @@ fn signal_axes(
     }
     push(
         project(Vec2::new(rect.max.x, rect.min.y - tick - gap)),
-        config.axis_labels.time.clone(),
+        config.labels.time.clone(),
         Anchor::Left,
     );
 
@@ -361,7 +361,7 @@ fn signal_axes(
     }
     push(
         project(Vec2::new(rect.min.x, rect.max.y + gap)),
-        config.axis_labels.amplitude.clone(),
+        config.labels.amplitude.clone(),
         Anchor::Above,
     );
     labels

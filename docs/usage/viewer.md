@@ -104,8 +104,9 @@ view gets axes with ticks and labels:
 
 The ticks follow the displayed time window, so they update while you pan and zoom. The labels
 are always drawn upright and facing you, whatever the angle of the view. `--no-axes` hides the
-axes when they are switched on in the configuration. The titles of the axes can be changed or
-translated in the [configuration](../configuration.md#labels).
+axes when they are switched on in the configuration. The titles of the axes, like every other
+text of the viewer, can be changed or translated in the
+[configuration](../configuration.md#labels).
 
 For signals, the value labels of the colour legend are hidden while the axes are shown: the
 amplitude axis shows the same range.

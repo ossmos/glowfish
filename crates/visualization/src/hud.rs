@@ -14,7 +14,7 @@ use crate::spectrogram::value_range;
 use crate::timeline::TIMELINE_HEIGHT;
 use crate::{
     DataKind, Dataset, DisplayMode, DisplayedGrid, Layout, Selection, VisualizationConfig,
-    VisualizationEntity, format,
+    VisualizationEntity, fill, format,
 };
 
 const BUTTON: Color = Color::srgb(0.2, 0.2, 0.22);
@@ -138,12 +138,12 @@ fn spawn_hud(
             },
             children![
                 (
-                    button("Surface"),
+                    button(&config.labels.surface),
                     ModeButton(DisplayMode::Surface),
                     observe(set_mode(DisplayMode::Surface))
                 ),
                 (
-                    button("Cubes"),
+                    button(&config.labels.cubes),
                     ModeButton(DisplayMode::Cubes),
                     observe(set_mode(DisplayMode::Cubes))
                 ),
@@ -162,7 +162,7 @@ fn spawn_hud(
                 column_gap: px(6),
                 ..default()
             },
-            children![(button("PNG"), observe(export_png))],
+            children![(button(&config.labels.save_png), observe(export_png))],
         ));
     }
 
@@ -210,8 +210,8 @@ fn spawn_hud(
 
     // bottom left: readout and axes
     let axes = match dataset.kind {
-        DataKind::Spectrogram => "time: right   frequency: depth   amplitude: up",
-        DataKind::Signal => "time: right   amplitude: up",
+        DataKind::Spectrogram => config.labels.hint_spectrogram.clone(),
+        DataKind::Signal => config.labels.hint_signal.clone(),
     };
     let labels = commands
         .spawn((
@@ -353,8 +353,10 @@ pub fn cell_at(grid: &Grid<MinMaxCell>, row: u64, band: usize) -> Option<MinMaxC
     grid.get(t, f).filter(|c| !c.is_empty())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn update_readout(
     dataset: Res<Dataset>,
+    config: Res<VisualizationConfig>,
     selection: Option<Res<Selection>>,
     displayed: Option<Res<DisplayedGrid>>,
     window: Single<&Window>,
@@ -389,27 +391,28 @@ fn update_readout(
     });
     let content = match target {
         Some((row, band)) => {
-            let mut parts = vec![format!(
-                "t = {}",
-                format::milliseconds(dataset.row_time_ms(row))
-            )];
+            let labels = &config.labels;
+            let time = format::milliseconds(dataset.row_time_ms(row));
+            let mut parts = vec![fill(&labels.readout_time, &[("time", &time)])];
             if dataset.kind == DataKind::Spectrogram {
-                parts.push(format!(
-                    "f = {}",
-                    format::frequency(dataset.band_frequency(band as f64))
+                let frequency = format::frequency(dataset.band_frequency(band as f64));
+                parts.push(fill(
+                    &labels.readout_frequency,
+                    &[("frequency", &frequency)],
                 ));
             }
             match cell_at(&displayed.grid, row as u64, band) {
                 Some(cell) if cell.min == cell.max => {
-                    parts.push(format!("amplitude {}", format::amplitude(cell.max)));
+                    let value = format::amplitude(cell.max);
+                    parts.push(fill(&labels.readout_value, &[("value", &value)]));
                 }
-                Some(cell) => parts.push(format!(
-                    "max {}   min {}",
-                    format::amplitude(cell.max),
-                    format::amplitude(cell.min)
-                )),
-                None => parts.push("not loaded".into()),
+                Some(cell) => {
+                    let (max, min) = (format::amplitude(cell.max), format::amplitude(cell.min));
+                    parts.push(fill(&labels.readout_range, &[("max", &max), ("min", &min)]));
+                }
+                None => parts.push(labels.readout_not_loaded.clone()),
             }
+            parts.retain(|part| !part.is_empty());
             parts.join("   |   ")
         }
         None => String::new(),

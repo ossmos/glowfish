@@ -6506,6 +6506,7 @@ dependencies = [
  "analyzer-files",
  "bevy",
  "glowfish-data",
+ "serde",
 ]
 
 [[package]]

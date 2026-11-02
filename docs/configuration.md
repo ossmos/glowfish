@@ -55,11 +55,33 @@ pitch = 35.0
 distance = 22.0
 
 [labels]
-# Titles of the axes (view.axes), e.g. for translations; an empty title is not shown.
-# {unit} in the frequency title becomes Hz or kHz.
+# Every text of the user interface, e.g. for translations. Values are filled into the
+# placeholders in braces; their order can change. Units (ms, Hz, kHz) stay as they are.
+
+# Axis titles (view.axes); an empty title is not shown. {unit} is Hz or kHz.
 time = "time [ms]"
 frequency = "frequency [{unit}]"
 amplitude = "amplitude"
+# Buttons: display mode and saving the window as PNG
+surface = "Surface"
+cubes = "Cubes"
+save_png = "PNG"
+# Shown instead of the axes
+hint_spectrogram = "time: right   frequency: depth   amplitude: up"
+hint_signal = "time: right   amplitude: up"
+# Readout under the cursor; {value} for one value, {max} and {min} for several
+readout_time = "t = {time}"
+readout_frequency = "f = {frequency}"
+readout_value = "amplitude {value}"
+readout_range = "max {max}   min {min}"
+readout_not_loaded = "not loaded"
+# Below the timeline
+timeline = "start {start}    end {end}    span {span}    of {length}"
+# Title of the file dialog
+open_file = "Open a measurement file"
+# Font for all texts. The bundled Fira Mono covers Latin, Greek and Cyrillic; set a font file
+# (TrueType / OpenType) for other scripts, e.g. "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc"
+# font = ""
 
 [scaling]
 # "linear": 0 to the full scale of the file
@@ -107,20 +129,61 @@ Time signals use `max_cells` too: up to 4096 points along time.
 
 ## labels
 
-Titles of the [axes](usage/viewer.md#axes), for example to translate them. A title set to
-`""` is not shown.
+Every text of the user interface, for example to translate it. Texts with values contain
+placeholders in braces, which are replaced by the values; a translation can put them in any
+order. A text set to `""` is not shown. Numbers and units (ms, Hz, kHz) are not translated.
 
-| Key | Default | |
-| --- | --- | --- |
-| `time` | `"time [ms]"` | title of the time axis; times are always in milliseconds |
-| `frequency` | `"frequency [{unit}]"` | title of the frequency axis; `{unit}` becomes `Hz` or `kHz`, the unit of the ticks |
-| `amplitude` | `"amplitude"` | title of the amplitude axis of signals |
+| Key | Default | Placeholders | Where |
+| --- | --- | --- | --- |
+| `time` | `"time [ms]"` | | title of the time [axis](usage/viewer.md#axes); times are always in ms |
+| `frequency` | `"frequency [{unit}]"` | `{unit}`: `Hz` or `kHz`, the unit of the ticks | title of the frequency axis |
+| `amplitude` | `"amplitude"` | | title of the amplitude axis of signals |
+| `surface` | `"Surface"` | | display mode button |
+| `cubes` | `"Cubes"` | | display mode button |
+| `save_png` | `"PNG"` | | button that saves the window |
+| `hint_spectrogram` | `"time: right   frequency: depth   amplitude: up"` | | hint shown without axes |
+| `hint_signal` | `"time: right   amplitude: up"` | | hint shown without axes |
+| `readout_time` | `"t = {time}"` | `{time}` | [readout](usage/viewer.md#controls) under the cursor |
+| `readout_frequency` | `"f = {frequency}"` | `{frequency}` | readout, spectrograms |
+| `readout_value` | `"amplitude {value}"` | `{value}` | readout of a single value |
+| `readout_range` | `"max {max}   min {min}"` | `{max}`, `{min}` | readout of a cell that combines several values |
+| `readout_not_loaded` | `"not loaded"` | | readout where no data is loaded yet |
+| `timeline` | `"start {start}    end {end}    span {span}    of {length}"` | `{start}`, `{end}`, `{span}`, `{length}` | below the [timeline](usage/viewer.md#the-timeline) |
+| `open_file` | `"Open a measurement file"` | | title of the file dialog |
+| `font` | not set | | font file for all texts, see below |
+
+### Fonts
+
+glowfish ships with the font Fira Mono, which covers Latin, Greek and Cyrillic letters, so
+translations into most European languages work without changes. For other scripts, such as
+Chinese, Japanese or Arabic, set `font` to a TrueType or OpenType file that contains them:
+
+```toml
+[labels]
+font = "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc"
+```
+
+The font is used for every text. Fira Mono is licensed under the SIL Open Font License 1.1.
+
+### Example
+
+Only the texts you change need to be in the file. A German example:
 
 ```toml
 [labels]
 time = "Zeit [ms]"
 frequency = "Frequenz [{unit}]"
 amplitude = "Amplitude"
+surface = "Fläche"
+cubes = "Quader"
+hint_spectrogram = "Zeit: rechts   Frequenz: Tiefe   Amplitude: oben"
+hint_signal = "Zeit: rechts   Amplitude: oben"
+readout_time = "t = {time}"
+readout_value = "Amplitude {value}"
+readout_range = "Max. {max}   Min. {min}"
+readout_not_loaded = "nicht geladen"
+timeline = "{start} bis {end}    Länge {span}    Datei {length}"
+open_file = "Messdatei öffnen"
 ```
 
 ## scaling
