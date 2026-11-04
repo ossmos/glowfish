@@ -37,6 +37,9 @@ installation with:
 glowfish --version
 ```
 
+To open measurement files from your file manager with a right click, see
+[Opening from the file manager](usage/file-manager.md).
+
 !!! tip "Older hardware"
     glowfish adapts how much it draws through a single setting, `view.max_cells`. If the
     viewer feels slow, lower it, see [Configuration](configuration.md#older-hardware).

@@ -130,102 +130,10 @@ translations of the interface. More details on the viewer, folders and exports a
 
 ## Opening files from the file manager
 
-QASS measurement files have no common file extension; they are recognized by their first 8
-bytes, `qassdata`. The steps below add glowfish to the right-click menu of your file manager,
-so files open without typing a command. They assume glowfish was installed with
-`cargo install` as above.
-
-### Linux
-
-Linux desktops recognize files by their content, so glowfish can become the default
-application for measurement files only.
-
-1. Define a file type for the files that start with `qassdata`:
-
-   ```sh
-   mkdir -p ~/.local/share/mime/packages
-   cat > ~/.local/share/mime/packages/qass.xml <<'EOF'
-   <?xml version="1.0" encoding="UTF-8"?>
-   <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
-     <mime-type type="application/x-qass">
-       <comment>QASS measurement file</comment>
-       <magic priority="80">
-         <match type="string" offset="0" value="qassdata"/>
-       </magic>
-     </mime-type>
-   </mime-info>
-   EOF
-   update-mime-database ~/.local/share/mime
-   ```
-
-2. Register glowfish as an application for that type:
-
-   ```sh
-   mkdir -p ~/.local/share/applications
-   cat > ~/.local/share/applications/glowfish.desktop <<EOF
-   [Desktop Entry]
-   Type=Application
-   Name=glowfish
-   Comment=View QASS measurement files
-   Exec=$HOME/.cargo/bin/glowfish %f
-   Terminal=false
-   MimeType=application/x-qass;
-   Categories=Science;Viewer;
-   EOF
-   update-desktop-database ~/.local/share/applications
-   ```
-
-   To open folders with glowfish as well, use `MimeType=application/x-qass;inode/directory;`.
-   glowfish then appears under *Open With* for folders, without becoming their default.
-
-3. Make glowfish the default for measurement files (optional):
-
-   ```sh
-   xdg-mime default glowfish.desktop application/x-qass
-   ```
-
-### Windows
-
-Windows decides by file extension only, so glowfish is added to the right-click menu of all
-files. Run these commands in a **Command Prompt** (`cmd`, not PowerShell); they only change
-your user account and need no administrator rights:
-
-```bat
-reg add "HKCU\Software\Classes\*\shell\glowfish" /ve /d "Open with glowfish" /f
-reg add "HKCU\Software\Classes\*\shell\glowfish" /v Icon /d "%USERPROFILE%\.cargo\bin\glowfish.exe" /f
-reg add "HKCU\Software\Classes\*\shell\glowfish\command" /ve /d "\"%USERPROFILE%\.cargo\bin\glowfish.exe\" \"%1\"" /f
-```
-
-To open folders as well, run the same commands with `Directory` in place of `*`. On
-Windows 11 the entry is under *Show more options*. To remove it again:
-
-```bat
-reg delete "HKCU\Software\Classes\*\shell\glowfish" /f
-```
-
-glowfish is a command line program, so a console window opens next to the viewer; closing it
-closes glowfish.
-
-### macOS
-
-macOS also decides by file extension, and only lists app bundles under *Open With*. A Quick
-Action adds glowfish to the right-click menu of all files and folders instead:
-
-1. Open **Automator** and create a new document of type **Quick Action**.
-2. At the top, set *Workflow receives current* to **files or folders** in **Finder**.
-3. Add the action **Run Shell Script** (search for it on the left), set *Pass input* to
-   **as arguments** and replace the script with:
-
-   ```sh
-   for f in "$@"; do
-     "$HOME/.cargo/bin/glowfish" "$f" > /dev/null 2>&1 &
-   done
-   ```
-
-4. Save it as **Open with glowfish**.
-
-Right-click a file or folder in Finder and choose **Quick Actions → Open with glowfish**. The
-first time, macOS may ask whether glowfish may access the folder.
+glowfish can be added to the right-click menu of the file manager on Linux, Windows and macOS,
+so measurement files open without typing a command. See
+[Opening from the file manager](https://ossmos.github.io/glowfish/usage/file-manager/) in the
+documentation for the setup on each operating system.
 
 ## Roadmap
 

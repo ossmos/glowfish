@@ -50,4 +50,5 @@ Time signals
 - [The viewer](usage/viewer.md): controls, the timeline and how data is loaded
 - [Opening a folder](usage/folders.md): choosing measurements, channels and files
 - [Exporting images](usage/export.md): PNG files for reports
+- [Opening from the file manager](usage/file-manager.md): open files with a right click
 - [Configuration](configuration.md): all settings of the configuration file
