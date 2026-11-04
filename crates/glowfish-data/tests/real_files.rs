@@ -2,8 +2,8 @@
 
 use std::path::PathBuf;
 
-use analyzer_files::StreamFile;
 use glowfish_data::{Downsampler, LoadPool, MinMax, Pyramid};
+use qass_files::StreamFile;
 
 fn open(name: &str) -> Option<StreamFile> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

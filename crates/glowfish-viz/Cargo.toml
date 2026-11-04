@@ -1,10 +1,10 @@
 [package]
-name = "visualization"
+name = "glowfish-viz"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-analyzer-files = { path = "../analyzer-files/" }
+qass-files = { path = "../qass-files/" }
 glowfish-data = { path = "../glowfish-data/" }
 bevy = "0.20.1"
 serde = { version = "1.0.229", features = ["derive"] }

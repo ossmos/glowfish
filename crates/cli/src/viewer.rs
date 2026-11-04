@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use bevy::audio::AudioPlugin;
 use bevy::prelude::*;
 use glowfish_app::{Database, FolderPlugin};
-use visualization::VisualizationPlugin;
+use glowfish_viz::VisualizationPlugin;
 
 use crate::config::Config;
 use crate::options::{ViewOptions, open_dataset};

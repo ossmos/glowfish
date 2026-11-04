@@ -6,7 +6,7 @@ use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::ui::{ComputedNode, InteractionDisabled, ScrollPosition, UiGlobalTransform};
 use bevy::ui_widgets::{Activate, Button, observe};
-use visualization::{BlocksViewInput, Labels, VisualizationConfig, fill};
+use glowfish_viz::{BlocksViewInput, Labels, VisualizationConfig, fill};
 
 use crate::catalog::{Catalog, FileEntry, Select, display_name};
 use crate::scan::{Scan, ScanFailed};

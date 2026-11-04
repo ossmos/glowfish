@@ -4,10 +4,10 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use analyzer_files::{Datamode, Datatype};
 use bevy::prelude::*;
 use chrono::{DateTime, Utc};
-use stream_metadata_cache::StreamFileMetadata;
+use qass_files::{Datamode, Datatype};
+use qass_metadata_cache::StreamFileMetadata;
 
 /// One measurement file.
 #[derive(Debug, Clone, PartialEq)]
@@ -248,7 +248,7 @@ fn step_index(index: usize, step: isize, count: usize) -> usize {
 }
 
 /// The name shown for a data type: from `labels.datatypes` by its code, else the English name.
-pub fn display_name(labels: &visualization::Labels, datatype: Option<Datatype>) -> String {
+pub fn display_name(labels: &glowfish_viz::Labels, datatype: Option<Datatype>) -> String {
     datatype
         .and_then(|d| labels.datatypes.get(&d.to_string()))
         .cloned()
@@ -423,7 +423,7 @@ pub(crate) mod tests {
 
     #[test]
     fn data_type_names_can_be_replaced() {
-        let mut labels = visualization::Labels::default();
+        let mut labels = glowfish_viz::Labels::default();
         assert_eq!(display_name(&labels, Some(Datatype::Raw)), "Raw");
         labels.datatypes.insert("RAW".into(), "Rohdaten".into());
         assert_eq!(display_name(&labels, Some(Datatype::Raw)), "Rohdaten");

@@ -6,7 +6,7 @@ use std::thread::JoinHandle;
 
 use bevy::prelude::*;
 use bevy::window::RequestRedraw;
-use stream_metadata_cache::{MetadataStore, SqliteStore, StreamFileMetadata};
+use qass_metadata_cache::{MetadataStore, SqliteStore, StreamFileMetadata};
 
 use crate::catalog::Catalog;
 

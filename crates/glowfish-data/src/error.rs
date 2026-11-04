@@ -1,7 +1,7 @@
 #[derive(Debug, thiserror::Error)]
 pub enum DataError {
     #[error(transparent)]
-    Read(#[from] analyzer_files::ReadError),
+    Read(#[from] qass_files::ReadError),
     #[error("loading was cancelled")]
     Cancelled,
     #[error("source error: {0}")]

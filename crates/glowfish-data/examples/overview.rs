@@ -3,8 +3,8 @@
 
 use std::time::Instant;
 
-use analyzer_files::StreamFile;
 use glowfish_data::{LoadPool, Pyramid};
+use qass_files::StreamFile;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);

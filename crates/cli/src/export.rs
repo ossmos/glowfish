@@ -11,9 +11,7 @@ use bevy::render::render_resource::{TextureFormat, TextureUsages};
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured, save_to_disk};
 use bevy::window::ExitCondition;
 use bevy::winit::WinitPlugin;
-use visualization::{
-    Dataset, DisplayedGrid, Layout, RenderToImage, Selection, VisualizationPlugin,
-};
+use glowfish_viz::{Dataset, DisplayedGrid, Layout, RenderToImage, Selection, VisualizationPlugin};
 
 use crate::options::{ViewOptions, open_dataset};
 
@@ -45,7 +43,7 @@ pub fn run(
     let (width, height) = size.unwrap_or((config.export.width, config.export.height));
     let dataset = open_dataset(file, &config)?;
     let selection = options.selection(&dataset)?;
-    let visualization = visualization::VisualizationConfig {
+    let visualization = glowfish_viz::VisualizationConfig {
         layout: Layout::Report,
         ..config.visualization()?
     };

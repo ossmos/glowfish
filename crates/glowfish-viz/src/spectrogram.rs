@@ -16,7 +16,7 @@ use crate::{
     VisualizationEntity,
 };
 
-const SHADER_PATH: &str = "embedded://visualization/shaders/spectrogram.wesl";
+const SHADER_PATH: &str = "embedded://glowfish_viz/shaders/spectrogram.wesl";
 
 /// Index of the cell (time, frequency) a vertex belongs to.
 pub const ATTRIBUTE_CELL: MeshVertexAttribute =

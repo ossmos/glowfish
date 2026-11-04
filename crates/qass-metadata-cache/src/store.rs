@@ -350,7 +350,7 @@ mod tests {
 mod sync_tests {
     use super::*;
 
-    const HEADER: &[u8] = include_bytes!("../../analyzer-files/testdata/compressed-header.bin");
+    const HEADER: &[u8] = include_bytes!("../../qass-files/testdata/compressed-header.bin");
 
     /// `root/a.000`, `root/b.000`, `root/sub/c.000` and a file that is no stream file.
     fn folder() -> tempfile::TempDir {

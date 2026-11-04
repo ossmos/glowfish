@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use analyzer_files::StreamFile;
+use qass_files::StreamFile;
 
 use crate::DataError;
 

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, bail};
 use clap::Args;
 use glowfish_data::LoadPool;
-use visualization::{Dataset, Selection};
+use glowfish_viz::{Dataset, Selection};
 
 use crate::config::{Cells, Config, Mode, ScalingMode};
 

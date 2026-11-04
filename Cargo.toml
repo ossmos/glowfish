@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/visualization", "crates/analyzer-files", "crates/stream-metadata-cache", "crates/glowfish-data", "crates/cli", "crates/glowfish-app"]
+members = ["crates/glowfish-viz", "crates/qass-files", "crates/qass-metadata-cache", "crates/glowfish-data", "crates/cli", "crates/glowfish-app"]
 
 # Bevy is unusably slow in plain debug builds: optimize dependencies, keep own code fast to build.
 [profile.dev]

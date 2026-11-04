@@ -1,5 +1,5 @@
-use analyzer_files::StreamFile;
 use chrono::{DateTime, Utc};
+use qass_files::StreamFile;
 
 use crate::error::StoreError;
 

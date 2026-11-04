@@ -3,7 +3,7 @@ use std::path::Path;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::{error::StoreError, metadata::StreamFileMetadata};
-use analyzer_files::StreamFile;
+use qass_files::StreamFile;
 
 /// Reads the metadata of all stream files in `root`, and in its subfolders if `recursive`.
 /// Files that are not stream files are skipped.

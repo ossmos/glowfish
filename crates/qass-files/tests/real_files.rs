@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use analyzer_files::{AdcType, Datamode, Datatype, SampleType, Samples, StreamData, StreamFile};
+use qass_files::{AdcType, Datamode, Datatype, SampleType, Samples, StreamData, StreamFile};
 
 fn open(name: &str) -> Option<StreamFile> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

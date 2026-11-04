@@ -7,8 +7,8 @@ use anyhow::{Context, bail};
 use bevy::input::mouse::MouseButton;
 use clap::ValueEnum;
 use glowfish_data::Scaling;
+use glowfish_viz::{CellValue, Controls, DisplayMode, Labels, Perspective, VisualizationConfig};
 use serde::{Deserialize, Serialize};
-use visualization::{CellValue, Controls, DisplayMode, Labels, Perspective, VisualizationConfig};
 
 /// The default configuration with comments, written by `glowfish config --init`.
 pub const DEFAULT_CONFIG: &str = r#"# glowfish configuration. Command line options override these values.

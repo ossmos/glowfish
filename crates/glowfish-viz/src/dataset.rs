@@ -2,9 +2,9 @@ use std::ops::Range;
 use std::path::Path;
 use std::sync::Arc;
 
-use analyzer_files::{Datamode, ParseError, StreamFile};
 use bevy::prelude::*;
 use glowfish_data::{LoadPool, Pyramid, Source};
+use qass_files::{Datamode, ParseError, StreamFile};
 
 /// What kind of data a dataset holds; decides how it is drawn.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

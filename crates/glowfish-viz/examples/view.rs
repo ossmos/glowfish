@@ -1,5 +1,5 @@
 //! Opens a stream file in the visualization:
-//! `cargo run --release -p visualization --example view -- <file> [options]`
+//! `cargo run --release -p glowfish-viz --example view -- <file> [options]`
 //!
 //! Options:
 //!   --cubes                  show cubes instead of a surface
@@ -12,7 +12,7 @@ use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured, save_to_disk};
 use bevy::winit::WinitSettings;
 use glowfish_data::{LoadPool, Scaling};
-use visualization::{
+use glowfish_viz::{
     CellValue, Dataset, DisplayMode, DisplayedGrid, Selection, VisualizationConfig,
     VisualizationPlugin,
 };

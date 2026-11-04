@@ -11,7 +11,7 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 use bevy::ui::IsDefaultUiCamera;
 use glowfish_data::LoadPool;
-use visualization::{Dataset, Selection, VisualizationConfig};
+use glowfish_viz::{Dataset, Selection, VisualizationConfig};
 
 pub use catalog::{Catalog, Select};
 pub use panel::PANEL_WIDTH;
@@ -22,7 +22,7 @@ use crate::scan::{Scan, poll_scan};
 /// A render layer without any content: the panel's cameras only draw UI.
 const UI_LAYER: usize = 31;
 
-/// Opens a folder; add after [`visualization::VisualizationPlugin`].
+/// Opens a folder; add after [`glowfish_viz::VisualizationPlugin`].
 pub struct FolderPlugin {
     pub root: PathBuf,
     /// Include files in subfolders.
@@ -62,7 +62,7 @@ impl Plugin for FolderPlugin {
                 (panel::style_buttons, panel::scroll_list),
             )
                 .chain()
-                .before(visualization::DataSystems),
+                .before(glowfish_viz::DataSystems),
         );
     }
 }
