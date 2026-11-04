@@ -7,3 +7,10 @@
 
 # documentation build
 /site
+
+# large local measurement files used by the tests (they skip when missing)
+/test-buffer-*
+*.tar.gz
+
+# local planning notes, not part of the repository
+/specification.md
