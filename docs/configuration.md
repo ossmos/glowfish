@@ -77,6 +77,8 @@ readout_range = "max {max}   min {min}"
 readout_not_loaded = "not loaded"
 # Below the timeline
 timeline = "start {start}    end {end}    span {span}    of {length}"
+# In the middle of the view while a file loads; {progress} in percent
+loading = "Loading {progress}"
 # Title of the file dialog
 open_file = "Open a measurement file"
 # Folder panel: section titles, the title of the file list, the second line of a file
@@ -161,6 +163,7 @@ order. A text set to `""` is not shown. Numbers and units (ms, Hz, kHz) are not 
 | `readout_range` | `"max {max}   min {min}"` | `{max}`, `{min}` | readout of a cell that combines several values |
 | `readout_not_loaded` | `"not loaded"` | | readout where no data is loaded yet |
 | `timeline` | `"start {start}    end {end}    span {span}    of {length}"` | `{start}`, `{end}`, `{span}`, `{length}` | below the [timeline](usage/viewer.md#the-timeline) |
+| `loading` | `"Loading {progress}"` | `{progress}`: percent | in the middle of the view while a file loads |
 | `open_file` | `"Open a measurement file"` | | title of the file dialog |
 | `project`, `measurement`, `channels` | `"Project"`, ... | | section titles of the [folder panel](usage/folders.md) |
 | `files` | `"Files on channel {channel}"` | `{channel}` | title of the file list |
@@ -222,6 +225,7 @@ readout_value = "Amplitude {value}"
 readout_range = "Max. {max}   Min. {min}"
 readout_not_loaded = "nicht geladen"
 timeline = "{start} bis {end}    Länge {span}    Datei {length}"
+loading = "Lade {progress}"
 open_file = "Messdatei öffnen"
 ```
 

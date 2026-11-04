@@ -8,6 +8,7 @@ use glowfish_data::{Grid, MinMaxCell};
 
 use crate::camera::{BlocksViewInput, ViewRig, ground_point, view_cursor, view_size};
 use crate::colormap::{rgba8, viridis};
+use crate::indicator::HideWhileLoading;
 use crate::layout::{FREQ_EXTENT, TIME_EXTENT};
 use crate::signal::{PLOT_MARGIN, plot_rect};
 use crate::spectrogram::value_range;
@@ -118,6 +119,7 @@ fn spawn_hud(
     if !interactive {
         commands.spawn((
             VisualizationEntity,
+            HideWhileLoading,
             Node {
                 position_type: PositionType::Absolute,
                 left: px(config.view_left + 14.0),
@@ -129,6 +131,7 @@ fn spawn_hud(
     } else if dataset.kind == DataKind::Spectrogram {
         commands.spawn((
             VisualizationEntity,
+            HideWhileLoading,
             Node {
                 position_type: PositionType::Absolute,
                 left: px(config.view_left + 10.0),
@@ -155,6 +158,7 @@ fn spawn_hud(
     if interactive {
         commands.spawn((
             VisualizationEntity,
+            HideWhileLoading,
             Node {
                 position_type: PositionType::Absolute,
                 right: px(10),
@@ -169,6 +173,7 @@ fn spawn_hud(
     // right: colour legend
     commands.spawn((
         VisualizationEntity,
+        HideWhileLoading,
         Node {
             position_type: PositionType::Absolute,
             right: px(14),
@@ -216,6 +221,7 @@ fn spawn_hud(
     let labels = commands
         .spawn((
             VisualizationEntity,
+            HideWhileLoading,
             Node {
                 position_type: PositionType::Absolute,
                 left: px(config.view_left + 10.0),

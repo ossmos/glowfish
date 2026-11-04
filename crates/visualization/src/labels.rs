@@ -36,6 +36,9 @@ pub struct Labels {
     /// Below the timeline: `{start}`, `{end}`, `{span}` and `{length}` of the file.
     pub timeline: String,
 
+    /// In the middle of the view while a file loads: `{progress}` in percent.
+    pub loading: String,
+
     /// Title of the file dialog.
     pub open_file: String,
 
@@ -82,6 +85,7 @@ impl Default for Labels {
             readout_range: "max {max}   min {min}".into(),
             readout_not_loaded: "not loaded".into(),
             timeline: "start {start}    end {end}    span {span}    of {length}".into(),
+            loading: "Loading {progress}".into(),
             open_file: "Open a measurement file".into(),
             project: "Project".into(),
             measurement: "Measurement".into(),

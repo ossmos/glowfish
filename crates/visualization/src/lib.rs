@@ -9,6 +9,7 @@ mod config;
 mod dataset;
 mod format;
 mod hud;
+mod indicator;
 mod labels;
 mod layout;
 mod loading;
@@ -64,6 +65,7 @@ impl Plugin for VisualizationPlugin {
                 signal::SignalPlugin,
                 timeline::TimelinePlugin,
                 hud::HudPlugin,
+                indicator::IndicatorPlugin,
             ))
             .add_systems(
                 First,
@@ -97,11 +99,89 @@ fn load_custom_font(config: Res<VisualizationConfig>, fonts: Option<ResMut<Asset
 #[derive(Resource)]
 pub(crate) struct Rebuild;
 
-fn despawn_previous(mut commands: Commands) {
+///
+/// The dataset usually changed in an earlier frame (e.g. in `Update` after a file selection), so
+/// the selection and the grid of the new dataset were already set when the scene is spawned.
+/// They are marked as changed again, so that the systems that update the new entities (placing
+/// the plot, the timeline window and labels, the legend) run for them. Without this, a new plot
+/// keeps its identity transform until the data finished loading, which stretches it over the
+/// whole window.
+fn despawn_previous(
+    mut commands: Commands,
+    selection: Option<ResMut<Selection>>,
+    displayed: Option<ResMut<DisplayedGrid>>,
+) {
     commands.despawn_all::<With<VisualizationEntity>>();
     commands.insert_resource(Rebuild);
+    if let Some(mut selection) = selection {
+        selection.set_changed();
+    }
+    if let Some(mut displayed) = displayed {
+        displayed.set_changed();
+    }
 }
 
 fn end_rebuild(mut commands: Commands) {
     commands.remove_resource::<Rebuild>();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::loading::tests::dataset;
+
+    #[derive(Resource, Default)]
+    struct Seen(Vec<(bool, bool)>);
+
+    /// Records whether the selection and the grid count as changed while the scene is spawned.
+    /// Runs every frame, so changes are relative to the previous frame like in the render systems.
+    fn record(
+        mut seen: ResMut<Seen>,
+        rebuild: Option<Res<Rebuild>>,
+        selection: Option<Res<Selection>>,
+        displayed: Option<Res<DisplayedGrid>>,
+    ) {
+        if rebuild.is_none() {
+            return;
+        }
+        seen.0.push((
+            selection.is_some_and(|s| s.is_changed()),
+            displayed.is_some_and(|d| d.is_changed()),
+        ));
+    }
+
+    #[test]
+    fn a_dataset_opened_during_update_is_spawned_with_changed_data() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, DataPlugin))
+            .init_resource::<VisualizationConfig>()
+            .init_resource::<Seen>()
+            .add_systems(
+                First,
+                despawn_previous.run_if(resource_exists_and_changed::<Dataset>),
+            )
+            .add_systems(Update, record.after(DataSystems))
+            .add_systems(Last, end_rebuild.run_if(resource_exists::<Rebuild>));
+        app.insert_resource(dataset(DataKind::Spectrogram, 1_000, 4));
+        for _ in 0..5 {
+            app.update();
+        }
+        // a file selection inserts the next dataset in `Update` before the data systems (like the
+        // folder panel); the scene follows a frame later
+        app.add_systems(
+            Update,
+            (|mut commands: Commands, mut done: Local<bool>| {
+                if !std::mem::replace(&mut *done, true) {
+                    commands.insert_resource(dataset(DataKind::Spectrogram, 2_000, 4));
+                }
+            })
+            .before(DataSystems),
+        );
+        for _ in 0..3 {
+            app.update();
+        }
+        let seen = &app.world().resource::<Seen>().0;
+        assert_eq!(seen.len(), 2, "the scene is spawned once per dataset");
+        assert_eq!(seen[1], (true, true));
+    }
 }

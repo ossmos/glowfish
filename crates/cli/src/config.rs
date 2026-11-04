@@ -53,6 +53,8 @@ readout_range = "max {max}   min {min}"
 readout_not_loaded = "not loaded"
 # Below the timeline
 timeline = "start {start}    end {end}    span {span}    of {length}"
+# In the middle of the view while a file loads; {progress} in percent
+loading = "Loading {progress}"
 # Title of the file dialog
 open_file = "Open a measurement file"
 # Folder panel: section titles, the title of the file list, the second line of a file

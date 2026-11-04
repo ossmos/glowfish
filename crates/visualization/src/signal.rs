@@ -84,6 +84,8 @@ fn spawn_signal(
             Rect::new(0.0, 0.0, 0.0, 0.0),
         ))),
         MeshMaterial2d(materials.add(ColorMaterial::default())),
+        // shown by the loading indicator once there is data
+        Visibility::Hidden,
     ));
 }
 

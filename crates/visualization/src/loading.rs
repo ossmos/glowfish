@@ -48,6 +48,13 @@ pub struct DisplayedGrid {
     pub complete: bool,
 }
 
+impl DisplayedGrid {
+    /// True when at least one cell has data, i.e. there is something to draw.
+    pub fn has_data(&self) -> bool {
+        self.grid.cells.iter().any(|c| !c.is_empty())
+    }
+}
+
 /// The state of background loading.
 #[derive(Resource, Default)]
 pub struct Loading {
@@ -56,12 +63,21 @@ pub struct Loading {
     request: Option<Request>,
     /// When the running load started.
     started: Option<std::time::Instant>,
+    /// True from opening a dataset until its first view is completely loaded.
+    initial: bool,
 }
 
 impl Loading {
     /// Progress `0.0..=1.0` of the running load, `None` when idle.
     pub fn progress(&self) -> Option<f32> {
         self.task.as_ref().map(|_| self.control.progress())
+    }
+
+    /// Progress `0.0..=1.0` of the first load after opening a dataset, `None` once the first
+    /// view is complete. Later loads (e.g. after zooming) only show progress in the timeline.
+    pub fn initial_progress(&self) -> Option<f32> {
+        self.initial
+            .then(|| self.progress().unwrap_or(0.0).clamp(0.0, 1.0))
     }
 
     fn cancel(&mut self) {
@@ -97,6 +113,7 @@ fn reset_on_new_dataset(
 ) {
     loading.cancel();
     loading.request = None;
+    loading.initial = true;
     commands.remove_resource::<DisplayedGrid>();
     // a selection inserted together with the dataset (e.g. from the command line) is kept
     let selection = selection.map_or(Selection::all(dataset.rows()), |s| *s);
@@ -141,6 +158,8 @@ fn request_load(
         }));
         loading.control = control;
         loading.started = Some(std::time::Instant::now());
+    } else {
+        loading.initial = false;
     }
     loading.request = Some(request);
 }
@@ -187,6 +206,9 @@ fn poll_load(
     };
     loading.task = None;
     *since_progress = 0.0;
+    if result.is_ok() {
+        loading.initial = false;
+    }
     let elapsed = loading.started.take().map(|s| s.elapsed());
     match result {
         Ok(grid) => {
@@ -296,18 +318,20 @@ pub(crate) mod tests {
         }
     }
 
-    #[test]
-    fn shows_partial_data_while_loading() {
+    /// A spectrogram whose reads take 10 ms each.
+    pub(crate) fn slow_dataset(rows: u64, bands: usize) -> Dataset {
         let mut slow = dataset(DataKind::Spectrogram, 1, 1);
         slow.pyramid = Arc::new(Pyramid::new(
-            Box::new(SlowRamp(Ramp {
-                rows: 300_000,
-                bands: 4,
-            })),
+            Box::new(SlowRamp(Ramp { rows, bands })),
             64 << 20,
             LoadPool::new(2),
         ));
-        let mut app = app(slow);
+        slow
+    }
+
+    #[test]
+    fn shows_partial_data_while_loading() {
+        let mut app = app(slow_dataset(300_000, 4));
         let mut partial = false;
         for _ in 0..2000 {
             app.update();

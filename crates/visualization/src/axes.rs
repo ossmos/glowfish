@@ -7,12 +7,13 @@
 use bevy::prelude::*;
 
 use crate::camera::ViewRig;
+use crate::indicator::is_loading;
 use crate::layout::{FREQ_EXTENT, TIME_EXTENT};
 use crate::signal::plot_rect;
 use crate::spectrogram::value_range;
 use crate::{
-    DataKind, Dataset, DisplayedGrid, Labels, Selection, VisualizationConfig, VisualizationEntity,
-    format,
+    DataKind, Dataset, DisplayedGrid, Labels, Loading, Selection, VisualizationConfig,
+    VisualizationEntity, format,
 };
 
 const COLOR: Color = Color::srgb(0.75, 0.75, 0.78);
@@ -133,9 +134,12 @@ fn update_axes(
     rigs: Query<(&Camera, &ViewRig)>,
     cameras_2d: Query<(&Camera, &GlobalTransform), PlotCamera>,
     labels: Query<Entity, With<AxisLabel>>,
+    loading: Res<Loading>,
     mut previous: Local<Vec<Label>>,
 ) {
-    let wanted = match (config.axes, selection) {
+    // no axes around a plot that is not drawn yet
+    let axes = config.axes && !is_loading(displayed.as_deref(), &loading);
+    let wanted = match (axes, selection) {
         (true, Some(selection)) => match dataset.kind {
             DataKind::Spectrogram => rigs
                 .iter()

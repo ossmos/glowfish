@@ -126,6 +126,8 @@ fn spawn_spectrogram(
             data,
         })),
         Transform::default(),
+        // shown by the loading indicator once there is data
+        Visibility::Hidden,
     ));
 }
 
