@@ -44,7 +44,7 @@ glowfish is currently built from source.
 ### Building
 
 ```sh
-git clone https://github.com/OWNER/glowfish.git
+git clone https://github.com/ossmos/glowfish.git
 cd glowfish
 cargo install --locked --path crates/cli
 ```
@@ -126,7 +126,7 @@ glowfish config --init     # create it with all defaults and comments
 
 The [configuration reference](docs/configuration.md) describes every setting, including
 translations of the interface. More details on the viewer, folders and exports are in the
-[documentation](docs/index.md).
+[documentation](https://ossmos.github.io/glowfish/).
 
 ## Opening files from the file manager
 

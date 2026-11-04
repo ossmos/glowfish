@@ -1,6 +1,9 @@
 [project]
 site_name = "glowfish"
 site_description = "Fast 3D visualization of Analyzer4D measurement files"
+site_url = "https://ossmos.github.io/glowfish/"
+repo_url = "https://github.com/ossmos/glowfish"
+repo_name = "ossmos/glowfish"
 nav = [
   { "Get started" = "index.md" },
   { "Installation" = "installation.md" },
