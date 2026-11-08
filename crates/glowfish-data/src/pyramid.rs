@@ -59,6 +59,22 @@ pub struct Grid<C> {
     pub cells: Vec<C>,
 }
 
+/// A grid built from cached data only, see [`Pyramid::preview`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct Preview<C> {
+    pub grid: Grid<C>,
+    /// Cells with data at the grid's own level. The other cells are filled from a coarser level
+    /// or empty.
+    pub exact_cells: usize,
+}
+
+impl<C> Preview<C> {
+    /// True when every cell has data at the grid's own level: nothing is left to load.
+    pub fn is_exact(&self) -> bool {
+        self.exact_cells == self.grid.cells.len()
+    }
+}
+
 impl<C: Copy> Grid<C> {
     pub fn rows_per_cell(&self) -> u64 {
         1 << self.level
@@ -168,6 +184,65 @@ impl<S: Source, D: Downsampler> Pyramid<S, D> {
         let range = self.clamp(range);
         self.grid(range, time_cells, freq_cells, None)
             .expect("peeking does not read from the source")
+    }
+
+    /// Like [`peek`](Self::peek), but cells without cached data at the grid's level are filled
+    /// from the nearest coarser level that is cached, so a zoomed or moved view shows a blurrier
+    /// version of the data instead of placeholders until it is loaded. A coarser cell covers
+    /// more rows than the cell it stands in for, so its value range may be wider.
+    ///
+    /// Never reads from the source; like `peek` it is meant to be called from a UI thread.
+    pub fn preview(
+        &self,
+        range: Range<u64>,
+        time_cells: usize,
+        freq_cells: usize,
+    ) -> Preview<D::Cell> {
+        let mut grid = self.peek(range, time_cells, freq_cells);
+        let exact_cells = grid.cells.iter().filter(|c| !D::is_empty(c)).count();
+        if exact_cells < grid.cells.len() {
+            self.fill_from_coarser(&mut grid);
+        }
+        Preview { grid, exact_cells }
+    }
+
+    /// Fills empty cells of `grid` from cached tiles of coarser levels, the finest one first.
+    fn fill_from_coarser(&self, grid: &mut Grid<D::Cell>) {
+        let freq_cells = grid.freq_cells;
+        let mut missing: Vec<usize> = (0..grid.time_cells)
+            .filter(|&t| {
+                grid.cells[t * freq_cells..(t + 1) * freq_cells]
+                    .iter()
+                    .any(D::is_empty)
+            })
+            .collect();
+        let mut cache = self.cache.lock().expect("cache lock poisoned");
+        for level in grid.level + 1..=MAX_LEVEL {
+            if missing.is_empty() {
+                break;
+            }
+            let shift = level - grid.level;
+            // consecutive time cells mostly share a tile; look each one up once
+            let mut tile: Option<(u64, Option<TileRef<D::Cell>>)> = None;
+            missing.retain(|&t| {
+                let cell = (grid.first_cell + t as u64) >> shift;
+                let index = cell / TILE_CELLS;
+                if tile.as_ref().is_none_or(|(i, _)| *i != index) {
+                    tile = Some((index, cache.get(level, index)));
+                }
+                let Some((_, Some(tile))) = &tile else {
+                    return true;
+                };
+                let row = tile.row((cell % TILE_CELLS) as usize, self.bands);
+                let out = &mut grid.cells[t * freq_cells..(t + 1) * freq_cells];
+                for (out, bands) in out.iter_mut().zip(row.chunks(grid.bands_per_cell)) {
+                    if D::is_empty(out) {
+                        *out = bands.iter().copied().fold(D::EMPTY, D::combine);
+                    }
+                }
+                out.iter().any(D::is_empty)
+            });
+        }
     }
 
     fn clamp(&self, range: Range<u64>) -> Range<u64> {
@@ -706,6 +781,49 @@ mod tests {
             let loaded = rows.start < 30_000 && rows.end > 20_000;
             assert_eq!(!grid.get(t, 0).unwrap().is_empty(), loaded, "cell {rows:?}");
         }
+    }
+
+    #[test]
+    fn preview_fills_gaps_from_coarser_levels() {
+        let pyramid: Pyramid<_> = Pyramid::new(
+            VecSource::new(100_000, 8, value),
+            usize::MAX,
+            LoadPool::new(2),
+        );
+        // nothing cached: nothing to fill from
+        let preview = pyramid.preview(0..100_000, 100, 4);
+        assert_eq!(preview.exact_cells, 0);
+        assert!(preview.grid.cells.iter().all(MinMaxCell::is_empty));
+
+        pyramid.query(0..100_000, 100, 4).unwrap();
+        pyramid.source().take_reads();
+        // zoomed far in: the finer level is not cached, the coarse cells stand in
+        let range = 40_000..41_000;
+        let exact = pyramid.peek(range.clone(), 100, 4);
+        assert!(exact.cells.iter().all(MinMaxCell::is_empty));
+        let preview = pyramid.preview(range.clone(), 100, 4);
+        assert!(pyramid.source().take_reads().is_empty());
+        assert_eq!(preview.exact_cells, 0);
+        assert!(!preview.is_exact());
+        let grid = &preview.grid;
+        assert_eq!((grid.level, grid.range.clone()), (exact.level, range));
+        for t in 0..grid.time_cells {
+            for f in 0..grid.freq_cells {
+                // a coarse cell covers its rows and more
+                let cell = grid.get(t, f).unwrap();
+                let own = brute_force(pyramid.source(), grid, grid.cell_rows(t), f);
+                assert!(
+                    cell.min <= own.min && cell.max >= own.max,
+                    "cell ({t}, {f})"
+                );
+            }
+        }
+
+        // once loaded, the preview is the exact grid
+        let loaded = pyramid.query(40_000..41_000, 100, 4).unwrap();
+        let preview = pyramid.preview(40_000..41_000, 100, 4);
+        assert!(preview.is_exact());
+        assert_eq!(preview.grid, loaded);
     }
 
     #[test]

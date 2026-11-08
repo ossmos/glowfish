@@ -23,9 +23,10 @@ const TRACK: Color = Color::srgb(0.25, 0.25, 0.28);
 #[require(Visibility::Hidden)]
 pub(crate) struct HideWhileLoading;
 
-/// True from opening a dataset until its first view can be drawn.
+/// True from opening a dataset until its first view is completely loaded. Later loads (zooming,
+/// panning) keep the plot visible: it shows coarser cached data until the new data is there.
 pub(crate) fn is_loading(displayed: Option<&DisplayedGrid>, loading: &Loading) -> bool {
-    !displayed.is_some_and(|d| d.has_data()) || loading.initial_progress().is_some()
+    displayed.is_none() || loading.initial_progress().is_some()
 }
 
 /// The overlay in the middle of the view.
@@ -112,7 +113,7 @@ fn spawn_indicator(mut commands: Commands, config: Res<VisualizationConfig>) {
 
 /// The plot and the HUD of a new dataset are only drawn once its first view is completely
 /// loaded; before that the plot would be (partly) a flat field of placeholders. The timeline
-/// shows the data that is loaded so far.
+/// shows the data that is loaded so far. Zooming and panning later do not hide them.
 #[allow(clippy::type_complexity)]
 fn show_content(
     displayed: Option<Res<DisplayedGrid>>,
@@ -235,6 +236,50 @@ mod tests {
                 .resource::<Loading>()
                 .initial_progress()
                 .is_some()
+        );
+    }
+
+    #[test]
+    fn zooming_keeps_the_plot_visible_with_coarse_data() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, DataPlugin))
+            .init_resource::<VisualizationConfig>()
+            .add_systems(Update, show_content.after(crate::DataSystems))
+            .insert_resource(slow_dataset(20_000, 4));
+        let view = app
+            .world_mut()
+            .spawn((SpectrogramView, Visibility::Inherited))
+            .id();
+        let wait_for_complete = |app: &mut App| {
+            for _ in 0..2000 {
+                app.update();
+                if app.world().resource::<DisplayedGrid>().complete {
+                    return;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(2));
+            }
+            panic!("loading did not complete");
+        };
+        wait_for_complete(&mut app);
+
+        // far enough in that nothing is cached at the new level
+        app.insert_resource(crate::Selection::new(10_000.0, 10_500.0));
+        app.update();
+        let displayed = app.world().resource::<DisplayedGrid>();
+        assert!(!displayed.complete);
+        assert_eq!(displayed.exact_cells, 0);
+        assert!(displayed.grid.cells.iter().all(|c| !c.is_empty()));
+        assert_eq!(
+            app.world().get::<Visibility>(view),
+            Some(&Visibility::Inherited)
+        );
+
+        wait_for_complete(&mut app);
+        let displayed = app.world().resource::<DisplayedGrid>();
+        assert_eq!(displayed.exact_cells, displayed.grid.cells.len());
+        assert_eq!(
+            app.world().get::<Visibility>(view),
+            Some(&Visibility::Inherited)
         );
     }
 }

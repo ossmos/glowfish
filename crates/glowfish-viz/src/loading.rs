@@ -3,7 +3,7 @@ use std::ops::Range;
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, block_on, poll_once};
 use bevy::window::RequestRedraw;
-use glowfish_data::{DataError, Grid, LoadControl, MinMaxCell};
+use glowfish_data::{DataError, Grid, LoadControl, MinMaxCell, Preview};
 
 use crate::{DataKind, Dataset, Selection, VisualizationConfig};
 
@@ -43,15 +43,22 @@ pub struct DataSystems;
 /// The grid currently shown.
 #[derive(Resource, Debug, Clone)]
 pub struct DisplayedGrid {
+    /// While loading, cells that are not loaded yet show the nearest coarser cached level, or
+    /// a placeholder if there is none.
     pub grid: Grid<MinMaxCell>,
+    /// Cells loaded at the grid's own level.
+    pub exact_cells: usize,
     /// False while it only contains the cached part of the request and loading continues.
     pub complete: bool,
 }
 
 impl DisplayedGrid {
-    /// True when at least one cell has data, i.e. there is something to draw.
-    pub fn has_data(&self) -> bool {
-        self.grid.cells.iter().any(|c| !c.is_empty())
+    fn preview(preview: Preview<MinMaxCell>) -> Self {
+        Self {
+            complete: preview.is_exact(),
+            exact_cells: preview.exact_cells,
+            grid: preview.grid,
+        }
     }
 }
 
@@ -139,15 +146,14 @@ fn request_load(
     }
     loading.cancel();
 
-    // show what is cached right away; placeholders mark the rest
-    let peeked = dataset
-        .pyramid
-        .peek(request.range.clone(), time_cells, freq_cells);
-    let complete = peeked.cells.iter().all(|c| !c.is_empty());
-    commands.insert_resource(DisplayedGrid {
-        grid: peeked,
-        complete,
-    });
+    // show what is cached right away; coarser cached data or placeholders stand in for the rest
+    let displayed = DisplayedGrid::preview(dataset.pyramid.preview(
+        request.range.clone(),
+        time_cells,
+        freq_cells,
+    ));
+    let complete = displayed.complete;
+    commands.insert_resource(displayed);
 
     if !complete {
         let control = LoadControl::new();
@@ -188,17 +194,15 @@ fn poll_load(
             && let Some(request) = &loading.request
         {
             *since_progress = 0.0;
-            let peeked = dataset.pyramid.peek(
+            let preview = dataset.pyramid.preview(
                 request.range.clone(),
                 request.time_cells,
                 request.freq_cells,
             );
-            let loaded =
-                |grid: &Grid<MinMaxCell>| grid.cells.iter().filter(|c| !c.is_empty()).count();
-            if displayed.is_none_or(|d| loaded(&peeked) > loaded(&d.grid)) {
+            if displayed.is_none_or(|d| preview.exact_cells > d.exact_cells) {
                 commands.insert_resource(DisplayedGrid {
-                    grid: peeked,
                     complete: false,
+                    ..DisplayedGrid::preview(preview)
                 });
             }
         }
@@ -219,6 +223,7 @@ fn poll_load(
                 );
             }
             commands.insert_resource(DisplayedGrid {
+                exact_cells: grid.cells.len(),
                 grid,
                 complete: true,
             })
