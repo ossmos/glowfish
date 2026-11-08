@@ -12,8 +12,8 @@ use glowfish_data::{Grid, MinMaxCell, Scaling, ValueRange};
 
 use crate::layout::{FREQ_EXTENT, TIME_EXTENT, VALUE_EXTENT};
 use crate::{
-    CellValue, DataKind, Dataset, DisplayMode, DisplayedGrid, Selection, VisualizationConfig,
-    VisualizationEntity,
+    CellValue, Colormap, DataKind, Dataset, DisplayMode, DisplayedGrid, Selection,
+    VisualizationConfig, VisualizationEntity,
 };
 
 const SHADER_PATH: &str = "embedded://glowfish_viz/shaders/spectrogram.wesl";
@@ -42,6 +42,7 @@ pub struct SpectrogramParams {
     pub freq_extent: f32,
     pub mode: u32,
     pub cell_value: u32,
+    pub colormap: u32,
     pub clip_x: Vec2,
 }
 
@@ -228,6 +229,10 @@ fn update_data(
             cell_value: match config.cell_value {
                 CellValue::Max => 0,
                 CellValue::Range => 1,
+            },
+            colormap: match config.colormap {
+                Colormap::Viridis => 0,
+                Colormap::Jet => 1,
             },
             clip_x: material.params.clip_x,
         };

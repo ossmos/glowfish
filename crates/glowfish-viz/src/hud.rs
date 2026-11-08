@@ -7,15 +7,15 @@ use bevy::ui_widgets::{Activate, Button, observe};
 use glowfish_data::{Grid, MinMaxCell};
 
 use crate::camera::{BlocksViewInput, ViewRig, ground_point, view_cursor, view_size};
-use crate::colormap::{rgba8, viridis};
+use crate::colormap::rgba8;
 use crate::indicator::HideWhileLoading;
 use crate::layout::{FREQ_EXTENT, TIME_EXTENT};
 use crate::signal::{PLOT_MARGIN, plot_rect};
 use crate::spectrogram::value_range;
 use crate::timeline::TIMELINE_HEIGHT;
 use crate::{
-    DataKind, Dataset, DisplayMode, DisplayedGrid, Layout, Selection, VisualizationConfig,
-    VisualizationEntity, fill, format,
+    Colormap, DataKind, Dataset, DisplayMode, DisplayedGrid, Layout, Selection,
+    VisualizationConfig, VisualizationEntity, fill, format,
 };
 
 const BUTTON: Color = Color::srgb(0.2, 0.2, 0.22);
@@ -107,12 +107,9 @@ fn spawn_hud(
             depth_or_array_layers: 1,
         },
         TextureDimension::D2,
-        (0..LEGEND_STEPS)
-            .rev()
-            .flat_map(|i| rgba8(viridis(i as f32 / (LEGEND_STEPS - 1) as f32)))
-            .collect(),
+        legend_pixels(config.colormap),
         TextureFormat::Rgba8UnormSrgb,
-        RenderAssetUsages::RENDER_WORLD,
+        RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD,
     ));
 
     // top left: display mode (spectrograms only), or the title of a report
@@ -329,12 +326,31 @@ fn style_buttons(
     }
 }
 
+/// Rgba8 pixels of the colour bar, the highest value on top.
+fn legend_pixels(colormap: Colormap) -> Vec<u8> {
+    (0..LEGEND_STEPS)
+        .rev()
+        .flat_map(|i| rgba8(colormap.color(i as f32 / (LEGEND_STEPS - 1) as f32)))
+        .collect()
+}
+
 fn update_legend(
     dataset: Res<Dataset>,
     config: Res<VisualizationConfig>,
     displayed: Option<Res<DisplayedGrid>>,
     mut labels: Query<(&LegendLabel, &mut Text, &mut Visibility)>,
+    bars: Query<&ImageNode, With<LegendBar>>,
+    mut images: ResMut<Assets<Image>>,
+    mut colormap: Local<Option<Colormap>>,
 ) {
+    if *colormap != Some(config.colormap) {
+        *colormap = Some(config.colormap);
+        for bar in &bars {
+            if let Some(mut image) = images.get_mut(&bar.image) {
+                image.data = Some(legend_pixels(config.colormap));
+            }
+        }
+    }
     let Some(displayed) = displayed else { return };
     if !displayed.is_changed() && !config.is_changed() {
         return;

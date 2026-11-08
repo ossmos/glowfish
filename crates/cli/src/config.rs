@@ -7,7 +7,9 @@ use anyhow::{Context, bail};
 use bevy::input::mouse::MouseButton;
 use clap::ValueEnum;
 use glowfish_data::Scaling;
-use glowfish_viz::{CellValue, Controls, DisplayMode, Labels, Perspective, VisualizationConfig};
+use glowfish_viz::{
+    CellValue, Colormap, Controls, DisplayMode, Labels, Perspective, VisualizationConfig,
+};
 use serde::{Deserialize, Serialize};
 
 /// The default configuration with comments, written by `glowfish config --init`.
@@ -19,6 +21,9 @@ mode = "surface"
 # "max": columns up to the maximum of each cell (keeps peaks)
 # "range": boxes from the minimum to the maximum (keeps peaks and gaps)
 cells = "max"
+# Colours of the amplitude: "viridis" (perceptually uniform, readable with colour vision
+# deficiencies) or "jet" (blue over cyan, yellow and red)
+colormap = "viridis"
 # Most cells (cubes or surface vertices) drawn; lower it for older hardware.
 # 65536 gives 512 (time) x 128 (frequency) cells.
 max_cells = 65536
@@ -120,6 +125,7 @@ pub struct Config {
 pub struct ViewConfig {
     pub mode: Mode,
     pub cells: Cells,
+    pub colormap: ColormapName,
     pub max_cells: usize,
     pub axes: bool,
     /// Degrees.
@@ -135,6 +141,7 @@ impl Default for ViewConfig {
         Self {
             mode: Mode::Surface,
             cells: Cells::Max,
+            colormap: ColormapName::Viridis,
             max_cells: VisualizationConfig::default().max_cells,
             axes: VisualizationConfig::default().axes,
             yaw: perspective.yaw.to_degrees().round(),
@@ -156,6 +163,13 @@ pub enum Mode {
 pub enum Cells {
     Max,
     Range,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum ColormapName {
+    Viridis,
+    Jet,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -336,6 +350,10 @@ impl Config {
                 Cells::Max => CellValue::Max,
                 Cells::Range => CellValue::Range,
             },
+            colormap: match v.colormap {
+                ColormapName::Viridis => Colormap::Viridis,
+                ColormapName::Jet => Colormap::Jet,
+            },
             scaling: self.scaling()?,
             axes: v.axes,
             labels: self.labels.clone(),
@@ -386,6 +404,20 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn colormaps() {
+        let colormap = |text: &str| {
+            Config::parse(text)
+                .unwrap()
+                .visualization()
+                .unwrap()
+                .colormap
+        };
+        assert_eq!(colormap(""), Colormap::Viridis);
+        assert_eq!(colormap("[view]\ncolormap = \"jet\"\n"), Colormap::Jet);
+        assert!(Config::parse("[view]\ncolormap = \"rainbow\"\n").is_err());
     }
 
     #[test]

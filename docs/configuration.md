@@ -27,7 +27,7 @@ error: invalid configuration /home/me/.config/glowfish/config.toml: TOML parse e
   |
 2 | mod = "cubes"
   | ^^^
-unknown field `mod`, expected one of `mode`, `cells`, `max_cells`, `axes`, `yaw`, `pitch`, `distance`
+unknown field `mod`, expected one of `mode`, `cells`, `colormap`, `max_cells`, `axes`, `yaw`, `pitch`, `distance`
 ```
 
 ## Defaults
@@ -43,6 +43,9 @@ mode = "surface"
 # "max": columns up to the maximum of each cell (keeps peaks)
 # "range": boxes from the minimum to the maximum (keeps peaks and gaps)
 cells = "max"
+# Colours of the amplitude: "viridis" (perceptually uniform, readable with colour vision
+# deficiencies) or "jet" (blue over cyan, yellow and red)
+colormap = "viridis"
 # Most cells (cubes or surface vertices) drawn; lower it for older hardware.
 # 65536 gives 512 (time) x 128 (frequency) cells.
 max_cells = 65536
@@ -133,6 +136,7 @@ recursive = true
 | --- | --- | --- |
 | `mode` | `"surface"` | `"surface"` or `"cubes"`, see [Surface and cubes](usage/viewer.md#surface-and-cubes) |
 | `cells` | `"max"` | `"max"`: columns from the ground up to the maximum of each cell. `"range"`: boxes from the minimum to the maximum, which also shows gaps |
+| `colormap` | `"viridis"` | colours of the amplitude, see [Colormaps](usage/viewer.md#colormaps) |
 | `max_cells` | `65536` | most cells drawn, see [below](#older-hardware) |
 | `axes` | `false` | axes with ticks and labels, see [Axes](usage/viewer.md#axes) |
 | `yaw` | `-30.0` | initial rotation around the vertical axis in degrees; 0 looks along the frequency axis |
