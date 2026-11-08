@@ -11,6 +11,6 @@ mod source;
 pub use downsample::{Downsampler, MinMax, MinMaxCell};
 pub use error::DataError;
 pub use load::{LoadControl, LoadPool};
-pub use pyramid::{Grid, Pyramid};
+pub use pyramid::{Grid, Preview, Pyramid};
 pub use scaling::{Scaling, ValueRange};
 pub use source::Source;
