@@ -364,7 +364,9 @@ mod tests {
 
     #[test]
     fn documentation_shows_the_default_file() {
-        let page = include_str!("../../../docs/configuration.md");
+        // include_str! keeps CRLF line endings from a Windows checkout, while the compiler turns
+        // them into LF in the DEFAULT_CONFIG literal
+        let page = include_str!("../../../docs/configuration.md").replace("\r\n", "\n");
         assert!(
             page.contains(&format!("```toml\n{DEFAULT_CONFIG}```")),
             "update the defaults in docs/configuration.md"
