@@ -10,4 +10,4 @@ chrono = "0.4.45"
 glowfish-data = { version = "0.1.0", path = "../glowfish-data" }
 qass-metadata-cache = { version = "0.1.0", path = "../qass-metadata-cache" }
 tokio = { version = "1.54.1", features = ["rt"] }
-glowfish-viz = { version = "0.1.0", path = "../glowfish-viz" }
+glowfish-viz = { version = "0.2.0", path = "../glowfish-viz" }
