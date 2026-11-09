@@ -121,6 +121,19 @@ the colours stand for. Which range of values fills the height is set by the
 - `linear`: from 0 to the largest value the file can hold,
 - `fixed`: a range you choose, e.g. to compare several files.
 
+### Colormaps
+
+The colours come from a colormap, set with `--colormap` or
+[`view.colormap`](../configuration.md#view):
+
+- `viridis` (default): dark purple over teal to yellow. Equal steps in value look like equal
+  steps in colour, and it stays readable with colour vision deficiencies and in grayscale.
+- `jet`: dark blue over cyan, yellow and red to dark red, familiar from MATLAB and many
+  measurement tools. Its bright cyan and yellow bands can look like edges that are not in the
+  data, so compare values with the legend or the readout.
+
+The colormap applies to the plot, the legend and the timeline.
+
 ## Signals
 
 Time signals are drawn as a flat plot of amplitude over time. Each column of the plot covers the

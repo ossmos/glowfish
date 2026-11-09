@@ -1,6 +1,6 @@
 [package]
 name = "cli"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 description = "Command line interface of glowfish: open the viewer or export images"
 
@@ -19,4 +19,4 @@ glowfish-data = { version = "0.1.0", path = "../glowfish-data" }
 rfd = "0.17.2"
 serde = { version = "1.0.229", features = ["derive"] }
 toml = "1.1.8"
-glowfish-viz = { version = "0.1.0", path = "../glowfish-viz" }
+glowfish-viz = { version = "0.2.0", path = "../glowfish-viz" }

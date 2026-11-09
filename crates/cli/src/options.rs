@@ -5,7 +5,7 @@ use clap::Args;
 use glowfish_data::LoadPool;
 use glowfish_viz::{Dataset, Selection};
 
-use crate::config::{Cells, Config, Mode, ScalingMode};
+use crate::config::{Cells, ColormapName, Config, Mode, ScalingMode};
 
 /// Options shared by the viewer and the export; they override the configuration file.
 #[derive(Debug, Clone, Default, Args)]
@@ -20,6 +20,9 @@ pub struct ViewOptions {
     /// "max": columns up to the maximum; "range": boxes from minimum to maximum
     #[arg(long, value_enum)]
     pub cells: Option<Cells>,
+    /// Colours of the amplitude
+    #[arg(long, value_enum)]
+    pub colormap: Option<ColormapName>,
     /// Most cells (cubes / surface vertices) drawn
     #[arg(long, value_name = "N")]
     pub max_cells: Option<usize>,
@@ -79,6 +82,7 @@ impl ViewOptions {
         let v = &mut config.view;
         set(&mut v.mode, self.mode);
         set(&mut v.cells, self.cells);
+        set(&mut v.colormap, self.colormap);
         set(&mut v.max_cells, self.max_cells);
         set(
             &mut v.axes,
@@ -169,12 +173,14 @@ mod tests {
         let mut config = Config::parse("[view]\nmode = \"cubes\"\nmax_cells = 100\n").unwrap();
         let options = ViewOptions {
             mode: Some(Mode::Surface),
+            colormap: Some(ColormapName::Jet),
             min: Some(1.0),
             max: Some(9.0),
             ..Default::default()
         };
         options.apply(&mut config);
         assert_eq!(config.view.mode, Mode::Surface);
+        assert_eq!(config.view.colormap, ColormapName::Jet);
         assert_eq!(config.view.max_cells, 100);
         assert_eq!(config.scaling.mode, ScalingMode::Fixed);
         assert_eq!(

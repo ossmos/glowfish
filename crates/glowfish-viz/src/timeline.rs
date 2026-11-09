@@ -5,11 +5,11 @@ use bevy::ui::{ComputedNode, UiGlobalTransform};
 use glowfish_data::{Grid, MinMaxCell, ValueRange};
 
 use crate::camera::BlocksViewInput;
-use crate::colormap::{rgba8, viridis};
+use crate::colormap::rgba8;
 use crate::spectrogram::value_range;
 use crate::{
-    Dataset, DisplayedGrid, Layout, Loading, Selection, VisualizationConfig, VisualizationEntity,
-    fill, format,
+    Colormap, Dataset, DisplayedGrid, Layout, Loading, Selection, VisualizationConfig,
+    VisualizationEntity, fill, format,
 };
 
 /// Height of the timeline panel in logical pixels.
@@ -203,6 +203,7 @@ fn hatch(width: usize, height: usize) -> Vec<u8> {
 /// hatched.
 fn overview_pixels(
     grid: &Grid<MinMaxCell>,
+    colormap: Colormap,
     range: ValueRange,
     width: usize,
     height: usize,
@@ -216,7 +217,7 @@ fn overview_pixels(
             }
             let y = height - 1 - f;
             let at = (y * width + t) * 4;
-            pixels[at..at + 4].copy_from_slice(&rgba8(viridis(range.normalize(cell.max))));
+            pixels[at..at + 4].copy_from_slice(&rgba8(colormap.color(range.normalize(cell.max))));
         }
     }
     pixels
@@ -242,7 +243,13 @@ fn update_overview(
     // the whole file at timeline resolution, only from what is cached
     let grid = dataset.pyramid.peek(0..dataset.rows(), width, height);
     let range = value_range(config.scaling, dataset.full_scale, &grid);
-    let pixels = overview_pixels(&grid_to_width(&grid, width), range, width, height);
+    let pixels = overview_pixels(
+        &grid_to_width(&grid, width),
+        config.colormap,
+        range,
+        width,
+        height,
+    );
     image.data = Some(pixels);
 }
 
@@ -450,8 +457,8 @@ mod tests {
                 },
             ],
         };
-        let pixels = overview_pixels(&grid, ValueRange::new(0.0, 1.0), 2, 1);
-        assert_eq!(pixels[..4], rgba8(viridis(1.0)));
+        let pixels = overview_pixels(&grid, Colormap::Jet, ValueRange::new(0.0, 1.0), 2, 1);
+        assert_eq!(pixels[..4], rgba8(crate::colormap::jet(1.0)));
         assert_eq!(pixels[4..8], HATCH[0]);
     }
 

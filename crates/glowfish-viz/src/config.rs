@@ -21,6 +21,17 @@ pub enum CellValue {
     Range,
 }
 
+/// How values are mapped to colours.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Colormap {
+    /// Dark purple over teal to yellow; perceptually uniform and readable with colour vision
+    /// deficiencies.
+    #[default]
+    Viridis,
+    /// Dark blue over cyan, yellow and red to dark red, as in MATLAB.
+    Jet,
+}
+
 /// What is shown around the plot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Layout {
@@ -74,6 +85,7 @@ pub struct VisualizationConfig {
     pub max_cells: usize,
     pub mode: DisplayMode,
     pub cell_value: CellValue,
+    pub colormap: Colormap,
     pub scaling: Scaling,
     pub controls: Controls,
     pub perspective: Perspective,
@@ -101,6 +113,7 @@ impl Default for VisualizationConfig {
             max_cells: 512 * 128,
             mode: DisplayMode::default(),
             cell_value: CellValue::default(),
+            colormap: Colormap::default(),
             scaling: Scaling::default(),
             controls: Controls::default(),
             perspective: Perspective::default(),

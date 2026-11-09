@@ -16,6 +16,8 @@ struct Params {
     mode: u32,
     // 0: columns up to the maximum, 1: boxes from minimum to maximum
     cell_value: u32,
+    // 0: viridis, 1: jet
+    colormap: u32,
     // local x range that is inside the selection; the rest is discarded
     clip_x: vec2<f32>,
 };
@@ -76,6 +78,19 @@ fn viridis(t: f32) -> vec3<f32> {
     return clamp(c0 + t * (c1 + t * (c2 + t * (c3 + t * (c4 + t * (c5 + t * c6))))), vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
+// jet, piecewise linear; keep in sync with colormap.rs
+fn jet(t: f32) -> vec3<f32> {
+    let x = 4.0 * clamp(t, 0.0, 1.0);
+    return clamp(vec3<f32>(1.5) - abs(vec3<f32>(x) - vec3<f32>(3.0, 2.0, 1.0)), vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
+fn colormap(t: f32) -> vec3<f32> {
+    if params.colormap == 1u {
+        return jet(t);
+    }
+    return viridis(t);
+}
+
 fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
     return pow(c, vec3<f32>(2.2));
 }
@@ -124,7 +139,7 @@ fn vertex(vertex: Vertex) -> VertexOutput {
         vec4<f32>(position, 1.0),
     );
     out.normal = mesh_normal_local_to_world(normal, vertex.instance_index);
-    out.color = select(viridis(top), PLACEHOLDER_COLOR, empty);
+    out.color = select(colormap(top), PLACEHOLDER_COLOR, empty);
     out.local_x = position.x;
     return out;
 }
